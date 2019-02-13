@@ -8,6 +8,7 @@ module JuDD
 
 using JuMP
 using BundleMethod
+include("parallel.jl")
 
 const BM = BundleMethod
 
@@ -91,8 +92,8 @@ function solveLagrangeDual(λ::Array{Float64,1})
 	# output
 	objvals = Float64[]
 	subgrads = Array{Float64,2}(undef, 0, length(λ))
-
-	for s in keys(LD.model)
+    
+	for s in parallel.partition(collect(keys(LD.model)))
 		# get the current model
 		m = LD.model[s]
 
@@ -140,8 +141,9 @@ function solveLagrangeDual(λ::Array{Float64,1})
 			start_index += 1
 		end
 	end
-
-    return -objvals, -subgrads
+    objvals2=parallel.reduce(objvals)
+    subgrads2=parallel.reduce(subgrads)
+    return -objvals2, -subgrads2
 end
 
 end  # modJuDD

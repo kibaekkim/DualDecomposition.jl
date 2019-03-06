@@ -13,7 +13,6 @@ Date:
 include("suc_wecc_data.jl")
 
 using JuDD
-using BundleMethod
 using JuMP, CPLEX
 
 # Number of scenarios: up to 1000 for each season

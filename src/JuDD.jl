@@ -59,7 +59,7 @@ function solve(solver)
 	nvars = LD.num_nonant_vars * LD.num_scenarios
 
 	# Create bundle method instance
-	bundle = BM.BundleInfo(BM.ProximalBundleMethod, nvars, LD.num_scenarios, solveLagrangeDual, true)
+	bundle = BM.BundleModel(BM.ProximalBundleMethod, nvars, LD.num_scenarios, solveLagrangeDual, true)
 
 	# set the underlying solver
 	JuMP.setsolver(bundle.m, solver)

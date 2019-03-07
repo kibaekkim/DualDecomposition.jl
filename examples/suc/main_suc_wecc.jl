@@ -39,7 +39,7 @@ function main_suc_wecc()
     JuDD.set_nonanticipativity_vars(nonanticipativity_vars())
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    JuDD.solve(CplexSolver(CPX_PARAM_SCRIND=0,CPX_PARAM_QPMETHOD=2))
+    JuDD.solve(CplexSolver(CPX_PARAM_SCRIND=0,CPX_PARAM_QPMETHOD=2), master_alrogithm = :ProximalBundle)
 end
 
 # This creates a Lagrange dual problem for each scenario s.

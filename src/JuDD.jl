@@ -64,7 +64,7 @@ function solve(solver; master_alrogithm = :ProximalBundle)
 	nvars = LD.num_nonant_vars * LD.num_scenarios
 
 	# Create bundle method instance
-	bundle = BM.Model(LD.master_algorithms[master_alrogithm], nvars, LD.num_scenarios, solveLagrangeDual, true)
+	bundle = BM.Model{LD.master_algorithms[master_alrogithm]}(nvars, LD.num_scenarios, solveLagrangeDual, true)
 
 	# set the underlying solver
 	JuMP.setsolver(bundle.m, solver)

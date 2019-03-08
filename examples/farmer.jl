@@ -1,5 +1,4 @@
 using JuDD
-using BundleMethod
 using JuMP, CPLEX
 
 const NS = 3  # number of scenarios

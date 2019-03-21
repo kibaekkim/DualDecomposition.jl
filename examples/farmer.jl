@@ -1,5 +1,4 @@
 using JuDD
-using BundleMethod
 using JuMP, CPLEX
 
 const NS = 3  # number of scenarios
@@ -30,7 +29,7 @@ function main_farmer()
     JuDD.set_nonanticipativity_vars(nonanticipativity_vars())
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    JuDD.solve(CplexSolver(CPX_PARAM_SCRIND=0,CPX_PARAM_QPMETHOD=2))
+    JuDD.solve(CplexSolver(CPX_PARAM_SCRIND=0,CPX_PARAM_QPMETHOD=2), master_alrogithm = :ProximalDualBundle)
 end
 
 # This creates a Lagrange dual problem for each scenario s.

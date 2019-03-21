@@ -19,8 +19,13 @@ mutable struct LagrangeDuals
 	nonanticipativity_vars::Array{Symbol,1}
 	num_nonant_vars::Int64
 	nonant_indices::Array{Int64,1}
+	master_algorithms::Dict{Symbol,Type}
 	function LagrangeDuals(n::Int64)
-		global LD = new(n, Dict(), Dict(), [], 0, [])
+		algo = Dict(
+			:ProximalBundle => BM.ProximalMethod,
+			:ProximalDualBundle => BM.ProximalDualMethod
+		)
+		global LD = new(n, Dict(), Dict(), [], 0, [], algo)
 		return
 	end
 end
@@ -34,7 +39,7 @@ function set_nonanticipativity_vars(vars::Array{Symbol,1})
 	LD.nonanticipativity_vars = vars
 end
 
-function solve(solver)
+function solve(solver; master_alrogithm = :ProximalBundle)
 	# check the validity of LagrangeDuals
 	if LD.num_scenarios <= 0 || length(LD.model) <= 0 || length(LD.nonanticipativity_vars) == 0
 		println("Invalid LagrangeDual structure.")
@@ -60,12 +65,7 @@ function solve(solver)
 	nvars = LD.num_nonant_vars * LD.num_scenarios
 
 	# Create bundle method instance
-	bundle = BM.BundleInfo(BM.ProximalBundleMethod, nvars, LD.num_scenarios, solveLagrangeDual)
-
-	# Add bounding constraints
-	x = getindex(bundle.m, :x)
-	@constraint(bundle.m, [i=1:LD.num_nonant_vars],
-		sum(x[(j-1)*LD.num_nonant_vars+i] for j in 1:LD.num_scenarios) == 0)
+	bundle = BM.Model{LD.master_algorithms[master_alrogithm]}(nvars, LD.num_scenarios, solveLagrangeDual, true)
 
 	# set the underlying solver
 	JuMP.setsolver(bundle.m, solver)
@@ -75,8 +75,8 @@ function solve(solver)
 	bundle.maxiter = 500
 
 	# Scale the objective coefficients by probability
-	for s in keys(LD.model)
-		affobj = getobjective(LD.model[s]).aff
+	for (s,m) in LD.model
+		affobj = getobjective(m).aff
 		affobj.coeffs *= LD.probability[s]
 	end
 
@@ -90,9 +90,9 @@ end
 
 function solveLagrangeDual(λ::Array{Float64,1})
 	# output
-	objvals = Float64[]
-	subgrads = Array{Float64,2}(undef, 0, length(λ))
-    
+	objvals = zeros(LD.num_scenarios)
+	subgrads = zeros(LD.num_scenarios, length(λ))
+
 	for s in parallel.partition(collect(keys(LD.model)))
 		# get the current model
 		m = LD.model[s]
@@ -129,8 +129,8 @@ function solveLagrangeDual(λ::Array{Float64,1})
 		end
 
 		# Add objective value and subgradient
-		push!(objvals, objval)
-		subgrads = vcat(subgrads, subgrad')
+		objvals[s] = objval
+		subgrads[s,:] = subgrad
 
 		# Reset objective coefficients
 		start_index = (s - 1) * LD.num_nonant_vars + 1
@@ -147,3 +147,4 @@ function solveLagrangeDual(λ::Array{Float64,1})
 end
 
 end  # modJuDD
+

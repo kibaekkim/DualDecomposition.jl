@@ -1,4 +1,5 @@
 module parallel
+using Compat
 using MPI
 
 myid = 0

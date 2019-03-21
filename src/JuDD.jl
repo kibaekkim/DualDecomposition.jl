@@ -6,6 +6,7 @@ Assume: two-stage stochastic programming
 
 module JuDD
 
+using Compat
 using JuMP
 using BundleMethod
 include("parallel.jl")
@@ -90,8 +91,9 @@ end
 
 function solveLagrangeDual(λ::Array{Float64,1})
 	# output
-	objvals = zeros(LD.num_scenarios)
-	subgrads = zeros(LD.num_scenarios, length(λ))
+	sindices = Int64[]
+	objvals = Float64[]
+	subgrads = Array{Float64,2}(undef, 0, length(λ))
 
 	for s in parallel.partition(collect(keys(LD.model)))
 		# get the current model
@@ -129,8 +131,9 @@ function solveLagrangeDual(λ::Array{Float64,1})
 		end
 
 		# Add objective value and subgradient
-		objvals[s] = objval
-		subgrads[s,:] = subgrad
+		push!(sindices, s)
+		push!(objvals, objval)
+		subgrads = vcat(subgrads, subgrad')
 
 		# Reset objective coefficients
 		start_index = (s - 1) * LD.num_nonant_vars + 1
@@ -141,9 +144,10 @@ function solveLagrangeDual(λ::Array{Float64,1})
 			start_index += 1
 		end
 	end
+	sindices2=parallel.reduce(sindices)
     objvals2=parallel.reduce(objvals)
     subgrads2=parallel.reduce(subgrads)
-    return -objvals2, -subgrads2
+    return -objvals2[sindices2], -subgrads2[sindices2,:]
 end
 
 end  # modJuDD

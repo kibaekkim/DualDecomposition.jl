@@ -13,7 +13,7 @@ Date:
 include("suc_wecc_data.jl")
 
 using JuDD
-using JuMP, CPLEX
+using JuMP, CPLEX, Ipopt
 
 # Number of scenarios: up to 1000 for each season
 const NS = 2
@@ -39,7 +39,7 @@ function main_suc_wecc()
     JuDD.set_nonanticipativity_vars(nonanticipativity_vars())
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    JuDD.solve(CplexSolver(CPX_PARAM_SCRIND=0,CPX_PARAM_QPMETHOD=2), master_alrogithm = :ProximalBundle)
+    JuDD.solve(IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
 end
 
 # This creates a Lagrange dual problem for each scenario s.

@@ -1,5 +1,6 @@
 using JuDD
-using JuMP, CPLEX, Ipopt
+using JuMP, Ipopt
+using GLPKMathProgInterface
 
 const NS = 3  # number of scenarios
 const probability = ones(3) / 3
@@ -34,7 +35,7 @@ end
 
 # This creates a Lagrange dual problem for each scenario s.
 function create_scenario_model(s::Int64)
-    m = Model(solver=CplexSolver(CPX_PARAM_SCRIND=0))
+    m = Model(solver=GLPKSolverMIP())
     @variable(m, 0 <= x[i=CROPS] <= 500, Int)
     @variable(m, y[j=PURCH] >= 0)
     @variable(m, w[k=SELL] >= 0)

@@ -32,7 +32,8 @@ Parameters (scenario):
 =#
 
 using JuDD
-using JuMP, CPLEX, Ipopt
+using JuMP, Ipopt
+using GLPKMathProgInterface
 
 function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
 
@@ -70,7 +71,7 @@ end
 function create_scenario_model(s::Int64)
 
     # construct JuMP.Model
-    model = Model(solver=CplexSolver(CPX_PARAM_SCRIND=0))
+    model = Model(solver=GLPKSolverMIP())
 
     ## 1st stage
     @variable(model, x[i=sR,t=sT] >= 0)

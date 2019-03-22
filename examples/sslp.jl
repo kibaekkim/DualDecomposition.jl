@@ -35,7 +35,8 @@ Parameters (scenario):
 =#
 
 using JuDD
-using JuMP, CPLEX, Ipopt
+using JuMP, Ipopt
+using GLPKMathProgInterface
 
 function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
 
@@ -71,7 +72,7 @@ end
 
 # This creates a Lagrange dual problem for each scenario s.
 function create_scenario_model(s::Int64)
-    model = Model(solver=CplexSolver(CPX_PARAM_SCRIND=0))
+    model = Model(solver=GLPKSolverMIP())
 
     @variable(model, x[j=sJ], Bin)
     @variable(model, y[i=sI,j=sJ], Bin)

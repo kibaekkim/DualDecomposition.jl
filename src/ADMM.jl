@@ -61,8 +61,8 @@ mutable struct Scenario
 
     auglag::JuMP.Model          # Augmented Lagrangian model
 
-    function Scenario(m_in::JuMP.Model, prob_in::Float64)
-        return new(m_in, prob_in)
+    function Scenario(m::JuMP.Model, prob::Float64)
+        return new(m, prob)
     end
 end
 
@@ -80,8 +80,8 @@ mutable struct AdmmAlg
     tmax::Integer       # the maximum number of SDM iterations
     tol::Float64        # convergence tolerance
 
-    function AdmmAlg()
-	return new(Dict(), [], [], 0, [], :MIQP, 1.0, 700, 1, 1e-6)
+    function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6)
+	return new(Dict(), [], [], 0, [], mode, rho, kmax, tmax, tol)
     end
 end
 
@@ -217,7 +217,7 @@ function update_quadsdm(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
                                   scen.qr, scen.qc, scen.qv)
 end
 
-function update_auglagobj_sdm(admm::AdmmAlg, scen::Scenario)
+function update_linobjsdm(admm::AdmmAlg, scen::Scenario)
     scratch = zeros(length(scen.Vs))
 
     for (i,s) in enumerate(scen.Vs)
@@ -257,12 +257,6 @@ function init_auglag_sdm(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
     # Set quadratic objective coefficients.
     update_quadsdm(admm, scen, s)
     auglag.internalModelLoaded = true
-
-    MathProgBase.optimize!(auglag.internalModel)
-    stat = MathProgBase.status(auglag.internalModel)
-
-    println("stat: ", stat)
-    println(MathProgBase.getsolution(auglag.internalModel))
 end
 
 function add_sample(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
@@ -283,16 +277,15 @@ function add_sample(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
 end
 
 function solve_sdm(admm::AdmmAlg, scen::Scenario)
-    update_auglagobj_sdm(admm, scen)
+    update_linobjsdm(admm, scen)
 
     for t in 1:admm.tmax
         xs = scen.x[admm.nonant_inds]
-        ws = scen.w + admm.rho*(xs - admm.z)
+        ws = scen.w .+ admm.rho*(xs .- admm.z)
         in_m = internalmodel(scen.m)
 
         # Update the objective coefficients of the linearized AugLag.
         copyto!(scen.scratch, 1:length(scen.c), scen.c, 1:length(scen.c))
-
         i = 1
         for j in admm.nonant_inds
             scen.scratch[j] += ws[i]
@@ -376,7 +369,7 @@ function init_auglag_miqp(admm::AdmmAlg, scen::Scenario)
     auglag.internalModelLoaded = true
 end
 
-function update_auglagobj_miqp(admm::AdmmAlg, scen::Scenario)
+function update_linobjmiqp(admm::AdmmAlg, scen::Scenario)
 
     # ---------------------------------------------------------------------
     # Update the objective coefficients in accordance with the updates of
@@ -396,11 +389,16 @@ function update_auglagobj_miqp(admm::AdmmAlg, scen::Scenario)
 end
 
 function print_iterlog(admm::AdmmAlg, k::Integer, err::Float64=Inf)
-    @printf("%5d\t%.6e\t%s\n", k, (err==Inf) ? 0 : err, string(admm.z))
+    if k % 50 == 0
+        @printf("Iteration Log\n")
+        @printf("%5s   %12s   %12s\n", "iter", "deviation", "z")
+    end
+
+    @printf("%5d   %12.6e   %s\n", k, (err==Inf) ? 0 : err, string(admm.z))
 end
 
 function solve_miqp(admm::AdmmAlg, scen::Scenario)
-    update_auglagobj_miqp(admm, scen)
+    update_linobjmiqp(admm, scen)
 
     in_auglag = internalmodel(scen.auglag)
     MathProgBase.optimize!(in_auglag)
@@ -461,20 +459,17 @@ function admm_solve(admm::AdmmAlg, solver=CplexSolver())
            solve_routine(admm, scen)
         end
 
-        update_z(admm)
-
         # Check the convergence: sqrt(∑ p(s)|x(s)-z|^2) <= ϵ
         err = 0
         for (key, scen) in admm.scen
-            i = 1
-            for j in admm.nonant_inds
-                err += scen.prob*((scen.x[j] - admm.z[i])^2)
-                i += 1
-            end
+            err += scen.prob*sum((scen.x[admm.nonant_inds[i]] - admm.z[i])^2
+                                 for i=1:length(admm.nonant_inds))
         end
         err = sqrt(err)
 
+        update_z(admm)
         update_w(admm)
+
         print_iterlog(admm, k, err)
         k += 1
     end

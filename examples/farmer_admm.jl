@@ -17,9 +17,9 @@ const Yield = [3.0 3.6 24.0; 2.5 3.0 20.0; 2.0 2.4 16.0]
 const Minreq = [200 240 0]    # minimum crop requirement
 
 # This is the main function to solve the example by using dual decomposition.
-function main_farmer()
-    # Create JuDD instance.
-    admm = ADMM.AdmmAlg()
+function main_farmer(;admm_options...)
+    # Create ADMM instance.
+    admm = ADMM.AdmmAlg(;admm_options...)
 
     # Add Lagrange dual problem for each scenario s.
     for s in 1:NS

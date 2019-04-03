@@ -67,7 +67,8 @@ function solve(solver; master_alrogithm = :ProximalBundle)
 	bundle = BM.ProximalDualModel(nvars, LD.num_scenarios, solveLagrangeDual, true)
 
 	# set the underlying solver
-	JuMP.setsolver(bundle.m, solver)
+	# JuMP.setsolver(bundle.m, solver)
+	bundle.solver = solver
 
 	# parameters for BundleMethod
 	# bundle.M_g = max(500, dv.nvars + nmodels + 1)

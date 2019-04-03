@@ -11,7 +11,7 @@ using BundleMethod
 
 const BM = BundleMethod
 
-mutable struct LagrangeDuals
+type LagrangeDuals
 	num_scenarios::Int64			# total number of scenarios
 	probability::Dict{Int64,Float64}	# probabilities
 	model::Dict{Int64,JuMP.Model}		# Dictionary of dual subproblems
@@ -21,8 +21,8 @@ mutable struct LagrangeDuals
 	master_algorithms::Dict{Symbol,Type}
 	function LagrangeDuals(n::Int64)
 		algo = Dict(
-			:ProximalBundle => BM.ProximalMethod,
-			:ProximalDualBundle => BM.ProximalDualMethod
+			# :ProximalBundle => BM.ProximalMethod,
+			:ProximalDualBundle => BM.ProximalDualModel
 		)
 		global LD = new(n, Dict(), Dict(), [], 0, [], algo)
 		return
@@ -49,7 +49,7 @@ function solve(solver; master_alrogithm = :ProximalBundle)
 	some_model = collect(values(LD.model))[1]
 
 	for v in LD.nonanticipativity_vars
-		vi = getindex(some_model, v)
+		vi = getvariable(some_model, v)
 
 		# Get the dimension of nonanticipativity variables
 		LD.num_nonant_vars += length(vi)
@@ -64,7 +64,7 @@ function solve(solver; master_alrogithm = :ProximalBundle)
 	nvars = LD.num_nonant_vars * LD.num_scenarios
 
 	# Create bundle method instance
-	bundle = BM.Model{LD.master_algorithms[master_alrogithm]}(nvars, LD.num_scenarios, solveLagrangeDual, true)
+	bundle = BM.ProximalDualModel(nvars, LD.num_scenarios, solveLagrangeDual, true)
 
 	# set the underlying solver
 	JuMP.setsolver(bundle.m, solver)

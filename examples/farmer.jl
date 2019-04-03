@@ -41,10 +41,10 @@ function create_scenario_model(s::Int64)
     @variable(m, w[k=SELL] >= 0)
 
     @objective(m, Min,
-          sum(Cost[i] * x[i] for i=CROPS)
-        + sum(Purchase[j] * y[j] for j=PURCH) - sum(Sell[k] * w[k] for k=SELL))
+          sum{Cost[i] * x[i], i=CROPS}
+        + sum{Purchase[j] * y[j], j=PURCH} - sum{Sell[k] * w[k], k=SELL})
 
-    @constraint(m, sum(x[i] for i=CROPS) <= Budget)
+    @constraint(m, sum{x[i], i=CROPS} <= Budget)
     @constraint(m, [j=PURCH], Yield[s,j] * x[j] + y[j] - w[j] >= Minreq[j])
     @constraint(m, Yield[s,3] * x[3] - w[3] - w[4] >= Minreq[3])
     @constraint(m, w[3] <= 6000)

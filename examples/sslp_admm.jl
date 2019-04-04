@@ -34,25 +34,15 @@ Parameters (scenario):
   h[i,s]: 1 if client i is present in scenario s, 0 otherwise
 =#
 
-using Compat
-if !isless(VERSION,v"0.7.0")
-    using Random
-end
-
 using ADMM
 using JuMP
 using CPLEX
 
 function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1;admm_options...)
+    srand(seed)
 
     # Create JuDD instance.
     admm = ADMM.AdmmAlg(;admm_options...)
-
-    if !isless(VERSION,v"0.7.0")
-	Random.seed!(seed)
-    else
-        srand(seed)
-    end
 
     global sJ = 1:nJ
     global sI = 1:nI
@@ -88,13 +78,13 @@ function create_scenario_model(s::Int64)
     @variable(model, y0[j=sJ] >= 0)
 
     @objective(model, Min,
-          sum(c[j]*x[j] for j in sJ)
-        - sum(q[i,j,s]*y[i,j] for i in sI for j in sJ)
-        + sum(q0[j]*y0[j] for j in sJ))
+               sum{c[j]*x[j], j in sJ}
+               - sum{q[i,j,s]*y[i,j], i in sI, j in sJ}
+               + sum{q0[j]*y0[j], j in sJ})
 
-    @constraint(model, sum(x[j] for j in sJ) <= v)
-    @constraint(model, [j=sJ], sum(d[i,j,s]*y[i,j] for i in sI) - y0[j] <= u*x[j])
-    @constraint(model, [i=sI], sum(y[i,j] for j in sJ) == h[i,s])
+    @constraint(model, sum{x[j], j in sJ} <= v)
+    @constraint(model, [j=sJ], sum{d[i,j,s]*y[i,j], i in sI} - y0[j] <= u*x[j])
+    @constraint(model, [i=sI], sum{y[i,j], j in sJ} == h[i,s])
 
     return model
 end
@@ -102,7 +92,7 @@ end
 # return the array of nonanticipativity variables
 nonanticipativity_vars() = [:x]
 
-main_sslp(10,50,50; rho=5000, kmax=5000)
+main_sslp(10,50,50; rho=10000, kmax=5000, tol=1e-4)
 # main_sslp(10,50,100)
 # main_sslp(10,50,500)
 # main_sslp(10,50,1000)

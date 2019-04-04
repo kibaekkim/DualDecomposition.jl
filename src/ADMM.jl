@@ -36,16 +36,10 @@ module ADMM
 using JuMP
 using MathProgBase
 using CPLEX
-using LinearAlgebra
-using SparseArrays
-using Printf
 
-export
-    admm_addscenario,
-    admm_setnonantvars,
-    admm_solve
+export AdmmAlg, admm_addscenario, admm_setnonantvars, admm_solve
 
-mutable struct Scenario
+type Scenario
     m::JuMP.Model               # scenario model
     prob::Float64               # probability
     id::Integer
@@ -67,7 +61,7 @@ mutable struct Scenario
     end
 end
 
-mutable struct AdmmAlg
+type AdmmAlg
     scen::Dict{Integer, Scenario} # scenarios
     nonant_names::Vector{Symbol}  # symbols of non-anticipativity variables
     nonant_inds::Vector{Int32}    # flattened indices of non-ant variables
@@ -82,8 +76,7 @@ mutable struct AdmmAlg
     tol::Float64        # convergence tolerance
     alpha::Float64      # convex combination of xs and z
 
-    function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6,
-                     alpha=1.0)
+    function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6, alpha=1.0)
 	return new(Dict(), [], [], 0, [], mode, rho, kmax, tmax, tol, alpha)
     end
 end
@@ -93,23 +86,15 @@ end
 ###########################################################################
 
 function init_nonantvars(admm::AdmmAlg)
-
     # ---------------------------------------------------------------------
     # Find out the flattened indices of non-anticipative variables.
     # Assume that each scenario has the same non-anticipative variables.
     # ---------------------------------------------------------------------
 
-    scen_model = iterate(admm.scen)[1].second.m
+    scen_model = collect(values(admm.scen))[1].m
 
     for name in admm.nonant_names
-        inds = try
-            getindex(scen_model, name)
-        catch
-            println("error: symbol name ", name, " does not exist.")
-            admm.nonant_len = 0
-            admm.nonant_inds = []
-            return false
-        end
+        inds = getvariable(scen_model, name)
 
         if isa(inds, Variable)
             admm.nonant_len += 1
@@ -302,7 +287,10 @@ function solve_sdm(admm::AdmmAlg, scen::Scenario)
         in_m = internalmodel(scen.m)
 
         # Update the objective coefficients of the linearized AugLag.
-        copyto!(scen.scratch, 1:length(scen.c), scen.c, 1:length(scen.c))
+	for j in 1:length(scen.c)
+	    scen.scratch[j] = scen.c[j]
+	end
+
         for (i,j) in enumerate(admm.nonant_inds)
             scen.scratch[j] += ws[i]
         end
@@ -393,7 +381,9 @@ function update_linobjmiqp(admm::AdmmAlg, scen::Scenario)
     # ---------------------------------------------------------------------
 
     num_vars = MathProgBase.numvar(scen.m)
-    copyto!(scen.scratch, 1:num_vars, scen.c, 1:num_vars)
+    for j in 1:num_vars
+	scen.scratch[j] = scen.c[j]
+    end
 
     for (i,j) in enumerate(admm.nonant_inds)
         scen.scratch[j] += scen.w[i] - admm.rho*admm.z[i]
@@ -486,8 +476,9 @@ function admm_solve(admm::AdmmAlg, solver=CplexSolver())
         # Check the convergence: sqrt(∑ p(s)|x(s)-z|^2) <= ϵ
         err = 0
         for (key, scen) in admm.scen
-            err += scen.prob*sum((scen.x[admm.nonant_inds[i]] - admm.z[i])^2
-                                 for i=1:length(admm.nonant_inds))
+	    for i=1:length(admm.nonant_inds)
+		err += scen.prob*(scen.x[admm.nonant_inds[i]] - admm.z[i])^2
+	    end
         end
         err = sqrt(err)
 

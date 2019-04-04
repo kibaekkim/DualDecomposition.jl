@@ -48,6 +48,7 @@ export
 mutable struct Scenario
     m::JuMP.Model               # scenario model
     prob::Float64               # probability
+    id::Integer
 
     A::SparseMatrixCSC{Float64} # constraint matrix
     c::Vector{Float64}          # linear objective coefficients
@@ -61,8 +62,8 @@ mutable struct Scenario
 
     auglag::JuMP.Model          # Augmented Lagrangian model
 
-    function Scenario(m::JuMP.Model, prob::Float64)
-        return new(m, prob)
+    function Scenario(m::JuMP.Model, prob::Float64, id::Integer)
+        return new(m, prob, id)
     end
 end
 
@@ -79,9 +80,11 @@ mutable struct AdmmAlg
     kmax::Integer       # the maximum number of ADMM iterations
     tmax::Integer       # the maximum number of SDM iterations
     tol::Float64        # convergence tolerance
+    alpha::Float64      # convex combination of xs and z
 
-    function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6)
-	return new(Dict(), [], [], 0, [], mode, rho, kmax, tmax, tol)
+    function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6,
+                     alpha=1.0)
+	return new(Dict(), [], [], 0, [], mode, rho, kmax, tmax, tol, alpha)
     end
 end
 
@@ -96,7 +99,7 @@ function init_nonantvars(admm::AdmmAlg)
     # Assume that each scenario has the same non-anticipative variables.
     # ---------------------------------------------------------------------
 
-    scen_model = admm.scen[1].m
+    scen_model = iterate(admm.scen)[1].second.m
 
     for name in admm.nonant_names
         inds = try
@@ -108,10 +111,20 @@ function init_nonantvars(admm::AdmmAlg)
             return false
         end
 
-        admm.nonant_len += length(inds)
+        if isa(inds, Variable)
+            admm.nonant_len += 1
+            push!(admm.nonant_inds, inds.col)
+        else
+            admm.nonant_len += length(inds)
+            innerArray = isa(inds, Array{Variable}) ? inds : inds.innerArray
 
-        for i in inds.innerArray
-            push!(admm.nonant_inds, i.col)
+            cols = []
+            for i in innerArray
+                push!(cols, i.col)
+            end
+
+            sort!(cols)
+            append!(admm.nonant_inds, cols)
         end
     end
 
@@ -127,10 +140,8 @@ function update_z(admm::AdmmAlg)
 
     fill!(admm.z, 0)
     for (key,scen) in admm.scen
-        i = 1
-        for j in admm.nonant_inds
+        for (i,j) in enumerate(admm.nonant_inds)
             admm.z[i] += scen.prob*scen.x[j]
-            i += 1
         end
     end
 end
@@ -142,10 +153,8 @@ function update_w(admm::AdmmAlg)
     # ---------------------------------------------------------------------
 
     for (key, scen) in admm.scen
-        i = 1
-        for j in admm.nonant_inds
+        for (i,j) in enumerate(admm.nonant_inds)
             scen.w[i] += admm.rho*(scen.x[j] - admm.z[i])
-            i += 1
         end
     end
 end
@@ -155,7 +164,8 @@ function init_scenarios(admm::AdmmAlg, auglag_solver)
 
     # ---------------------------------------------------------------------
     # For each scenario, initialize data structure and generate an initial
-    # point by solving the scenario model.
+    # point by solving the scenario model. Initial points between scenarios
+    # are generated to share the same 1st stage variable value.
     # ---------------------------------------------------------------------
 
     for (key, scen) in admm.scen
@@ -170,9 +180,10 @@ function init_scenarios(admm::AdmmAlg, auglag_solver)
             return false
         end
 
-        scen.x = MathProgBase.getsolution(in_m)
-        scen.A = MathProgBase.getconstrmatrix(in_m)
-        scen.c = MathProgBase.getobj(in_m)
+        scen.x = copy(MathProgBase.getsolution(in_m))
+        scen.A = copy(MathProgBase.getconstrmatrix(in_m))
+        scen.c = copy(MathProgBase.getobj(in_m))
+
         scen.w = zeros(admm.nonant_len)
         scen.scratch = zeros(MathProgBase.numvar(scen.m))
         scen.Vs = []
@@ -199,19 +210,19 @@ function init_scenarios(admm::AdmmAlg, auglag_solver)
     return true
 end
 
-function update_quadsdm(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
+function update_quadsdm(admm::AdmmAlg, scen::Scenario)
+    # Assume that the last sample in Vs was the new one just added.
+    s = scen.Vs[end]
     num_samples = length(scen.Vs)
 
-    for (i,v) in enumerate(scen.Vs)
-        qval = (admm.rho/2)*dot(v,s)
+    for i in 1:length(scen.Vs)
+        vs = scen.Vs[i][admm.nonant_inds]
+        ss = s[admm.nonant_inds]
+        qval = (admm.rho/2)*dot(vs,ss)
         push!(scen.qr, i)
-        push!(scen.qc, num_samples+1)
+        push!(scen.qc, num_samples)
         push!(scen.qv, qval)
     end
-
-    push!(scen.qr, num_samples+1)
-    push!(scen.qc, num_samples+1)
-    push!(scen.qv, (admm.rho/2)*dot(s,s))
 
     MathProgBase.setquadobjterms!(internalmodel(scen.auglag),
                                   scen.qr, scen.qc, scen.qv)
@@ -234,7 +245,7 @@ function init_auglag_sdm(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
 
     # 1.0 is for the convex combination constraint
     num_rows = scen.A.m + 1
-    A = sparse(collect(1:num_rows), ones(num_rows), [scen.A*s; 1.0], num_rows, 1)
+    A = sparse(collect(1:num_rows), ones(num_rows), [scen.A*s; 1.0]) # [I J V]
     f = dot(scen.c, s)
 
     linconstr = scen.m.linconstr::Vector{LinearConstraint}
@@ -255,14 +266,15 @@ function init_auglag_sdm(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
                               [f], rowlb, rowub, scen.m.objSense)
 
     # Set quadratic objective coefficients.
-    update_quadsdm(admm, scen, s)
+    push!(scen.Vs, copy(s))
+    update_quadsdm(admm, scen)
+    update_linobjsdm(admm, scen)
     auglag.internalModelLoaded = true
 end
 
 function add_sample(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
     if !scen.auglag.internalModelLoaded
         init_auglag_sdm(admm, scen, s)
-        push!(scen.Vs, s)
         return
     end
 
@@ -272,25 +284,29 @@ function add_sample(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
     constr_coeffs = [ scen.A*s; 1.0 ] # 1.0 for the convex combination
     MathProgBase.addvar!(in_auglag, collect(1:MathProgBase.numconstr(scen.m)+1),
                          constr_coeffs, 0, 1, f)
-    update_quadsdm(admm, scen, s)
-    push!(scen.Vs, s)
+
+    push!(scen.Vs, copy(s))
+    update_quadsdm(admm, scen)
+    update_linobjsdm(admm, scen)
 end
 
 function solve_sdm(admm::AdmmAlg, scen::Scenario)
-    update_linobjsdm(admm, scen)
+    xs = (1 - admm.alpha)*admm.z + admm.alpha*scen.x[admm.nonant_inds]
 
     for t in 1:admm.tmax
-        xs = scen.x[admm.nonant_inds]
+        if t > 1
+            xs = scen.x[admm.nonant_inds]
+        end
+
         ws = scen.w .+ admm.rho*(xs .- admm.z)
         in_m = internalmodel(scen.m)
 
         # Update the objective coefficients of the linearized AugLag.
         copyto!(scen.scratch, 1:length(scen.c), scen.c, 1:length(scen.c))
-        i = 1
-        for j in admm.nonant_inds
+        for (i,j) in enumerate(admm.nonant_inds)
             scen.scratch[j] += ws[i]
-            i += 1
         end
+
         MathProgBase.setobj!(in_m, scen.scratch)
 
         # Solve the FW problem.
@@ -315,12 +331,12 @@ function solve_sdm(admm::AdmmAlg, scen::Scenario)
             return stat
         end
 
-        alpha = MathProgBase.getsolution(in_auglag)
+        beta = MathProgBase.getsolution(in_auglag)
         fill!(scen.x, 0)
 
         for (i,s) in enumerate(scen.Vs)
             for j in 1:length(scen.x)
-                scen.x[j] += alpha[i]*s[j]
+                scen.x[j] += beta[i]*s[j]
             end
         end
     end
@@ -379,10 +395,8 @@ function update_linobjmiqp(admm::AdmmAlg, scen::Scenario)
     num_vars = MathProgBase.numvar(scen.m)
     copyto!(scen.scratch, 1:num_vars, scen.c, 1:num_vars)
 
-    i = 1
-    for j in admm.nonant_inds
+    for (i,j) in enumerate(admm.nonant_inds)
         scen.scratch[j] += scen.w[i] - admm.rho*admm.z[i]
-        i += 1
     end
 
     MathProgBase.setobj!(internalmodel(scen.auglag), scen.scratch)
@@ -391,10 +405,20 @@ end
 function print_iterlog(admm::AdmmAlg, k::Integer, err::Float64=Inf)
     if k % 50 == 0
         @printf("Iteration Log\n")
-        @printf("%5s   %12s   %12s\n", "iter", "deviation", "z")
+        @printf("%5s   %12s\n", "iter", "deviation")
     end
 
-    @printf("%5d   %12.6e   %s\n", k, (err==Inf) ? 0 : err, string(admm.z))
+    @printf("%5d   %12.6e\n", k, (err==Inf) ? 0 : err)
+end
+
+function print_summary(admm::AdmmAlg, k::Integer, err::Float64)
+    objval = 0
+
+    for (key, scen) in admm.scen
+        objval += scen.prob*dot(scen.x, scen.c)
+    end
+
+    @printf("Objective value: %10.6e", objval)
 end
 
 function solve_miqp(admm::AdmmAlg, scen::Scenario)
@@ -418,7 +442,7 @@ end
 # -------------------------------------------------------------------------
 
 function admm_addscenario(admm::AdmmAlg, s::Integer, p::Float64, m::JuMP.Model)
-    admm.scen[s] = Scenario(m, p)
+    admm.scen[s] = Scenario(m, p, s)
 end
 
 function admm_setnonantvars(admm::AdmmAlg, names::Vector{Symbol})
@@ -450,10 +474,10 @@ function admm_solve(admm::AdmmAlg, solver=CplexSolver())
         return
     end
 
-    print_iterlog(admm, 0)
-
+    k = 0
     err = Inf
-    k = 1
+    print_iterlog(admm, k)
+
     while k < admm.kmax && err >= admm.tol
         for (key, scen) in admm.scen
            solve_routine(admm, scen)
@@ -470,11 +494,13 @@ function admm_solve(admm::AdmmAlg, solver=CplexSolver())
         update_z(admm)
         update_w(admm)
 
-        print_iterlog(admm, k, err)
         k += 1
+        print_iterlog(admm, k, err)
     end
+
+    print_summary(admm, k, err)
 end
 
-end
+end # module ADMM
 
 

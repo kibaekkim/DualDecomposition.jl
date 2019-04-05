@@ -58,8 +58,8 @@ function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1;admm_options...)
     Pr = ones(nS)/nS
 
     # Add Lagrange dual problem for each scenario s.
-    for s in 1:nS
-        admm_addscenario(admm, s, Pr[s], create_scenario_model(s))
+    if !admm_addscenarios(admm, nS, Pr, create_scenario_model)
+        return
     end
 
     # Set nonanticipativity variables as an array of symbols.

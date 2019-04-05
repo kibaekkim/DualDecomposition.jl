@@ -94,7 +94,7 @@ function solveLagrangeDual(λ::Array{Float64,1})
 	# output
 	sindices = Int64[]
 	objvals = Float64[]
-	subgrads = Array{Float64,2}(undef, 0, length(λ))
+	subgrads = Array{Float64,2}(0, length(λ))
 
 	for s in parallel.partition(collect(keys(LD.model)))
 		# get the current model

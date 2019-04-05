@@ -148,7 +148,19 @@ function solveLagrangeDual(λ::Array{Float64,1})
 	sindices2=parallel.reduce(sindices)
     objvals2=parallel.reduce(objvals)
     subgrads2=parallel.reduce(subgrads)
-    return -objvals2[sindices2], -subgrads2[sindices2,:]
+	resobjvals = zeros(objvals2)
+	ressubgrads = zeros(subgrads2)
+	k = 1
+	for i in sindices2
+		resobjvals[i] = objvals2[k]
+		k += 1
+	end
+	k = 1
+	for i in sindices2
+		ressubgrads[i,:] = subgrads2[k,:]
+		k += 1
+	end
+    return -resobjvals, -ressubgrads
 end
 
 end  # modJuDD

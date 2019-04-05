@@ -23,7 +23,7 @@ function main_farmer()
 
     # Add Lagrange dual problem for each scenario s.
     for s in 1:NS
-        JuDD.add_Lagrange_dual_model(s, probability[s], create_scenario_model(s))
+        JuDD.add_Lagrange_dual_model(s, probability[s], create_scenario_model)
     end
 
     # Set nonanticipativity variables as an array of symbols.
@@ -53,6 +53,4 @@ end
 
 # return the array of nonanticipativity variables
 nonanticipativity_vars() = [:x]
-JuDD.parallel.init()
 main_farmer()
-JuDD.parallel.finalize()

@@ -15,15 +15,19 @@ function finalize()
     MPI.Finalize()
 end
 
+function getpartition()
+    partitionlist
+end
+
 function partition(part)
     global mylist = Array{Array{Int64,1},1}(nprocs)
     for i in 1:nprocs
         mylist[i] = Array{Int64,1}(0)
     end
-    for i in part
+    for i in 1:part
         push!(mylist[i%nprocs+1], i)
     end
-    mylist[myid+1]
+    global partitionlist = mylist[myid+1]
 end
 
 function reduce(x::Array{Float64,1})

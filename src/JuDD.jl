@@ -16,7 +16,7 @@ const BM = BundleMethod
 type LagrangeDuals
 	num_scenarios::Int64			# total number of scenarios
 	probability::Dict{Int64,Float64}	# probabilities
-	model::Dict{Int64,JuMP.Model}		# Dictionary of dual subproblems
+	model::Dict{Int64,Any}		# Dictionary of dual subproblems
 	nonanticipativity_vars::Array{Symbol,1}
 	num_nonant_vars::Int64
 	nonant_indices::Array{Int64,1}
@@ -26,14 +26,19 @@ type LagrangeDuals
 			# :ProximalBundle => BM.ProximalMethod,
 			:ProximalDualBundle => BM.ProximalDualModel
 		)
+		parallel.init()
+		parallel.partition(n)
+		finalizer(LagrangeDuals, LagrangeDuals->parallel.finalize())
 		global LD = new(n, Dict(), Dict(), [], 0, [], algo)
 		return
 	end
 end
 
-function add_Lagrange_dual_model(s::Int64, p::Float64, model::JuMP.Model)
-	LD.probability[s] = p
-	LD.model[s] = model
+function add_Lagrange_dual_model(s::Int64, p::Float64, create_model)
+	if s in parallel.getpartition()
+		LD.probability[s] = p
+		LD.model[s] = create_model(s)
+	end
 end
 
 function set_nonanticipativity_vars(vars::Array{Symbol,1})
@@ -96,10 +101,7 @@ function solveLagrangeDual(λ::Array{Float64,1})
 	objvals = Float64[]
 	subgrads = Array{Float64,2}(0, length(λ))
 
-	for s in parallel.partition(collect(keys(LD.model)))
-		# get the current model
-		m = LD.model[s]
-
+	for (s,m) in LD.model
 		# initialize results
 		objval = 0.0
 		subgrad = zeros(length(λ))

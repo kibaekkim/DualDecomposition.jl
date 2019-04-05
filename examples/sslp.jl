@@ -60,7 +60,7 @@ function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
 
     # Add Lagrange dual problem for each scenario s.
     for s in 1:nS
-        JuDD.add_Lagrange_dual_model(s, Pr[s], create_scenario_model(s))
+        JuDD.add_Lagrange_dual_model(s, Pr[s], create_scenario_model)
     end
 
     # Set nonanticipativity variables as an array of symbols.

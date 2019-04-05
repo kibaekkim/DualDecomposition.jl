@@ -34,6 +34,7 @@ Parameters (scenario):
 using JuDD
 using JuMP, Ipopt
 using GLPKMathProgInterface
+using CPLEX
 
 function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
 
@@ -57,7 +58,7 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
 
     # Add Lagrange dual problem for each scenario s.
     for s in 1:nS
-        JuDD.add_Lagrange_dual_model(s, Pr[s], create_scenario_model(s))
+        JuDD.add_Lagrange_dual_model(s, Pr[s], create_scenario_model)
     end
 
     # Set nonanticipativity variables as an array of symbols.
@@ -71,7 +72,7 @@ end
 function create_scenario_model(s::Int64)
 
     # construct JuMP.Model
-    model = Model(solver=GLPKSolverMIP())
+    model = Model(solver=CplexSolver(CPX_PARAM_SCRIND=0,CPX_PARAM_THREADS=1))
 
     ## 1st stage
     @variable(model, x[i=sR,t=sT] >= 0)

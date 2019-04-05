@@ -53,5 +53,6 @@ end
 
 # return the array of nonanticipativity variables
 nonanticipativity_vars() = [:x]
-
+JuDD.parallel.init()
 main_farmer()
+JuDD.parallel.finalize()

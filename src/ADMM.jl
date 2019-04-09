@@ -36,10 +36,18 @@ module ADMM
 using JuMP
 using MathProgBase
 using CPLEX
+using MPI
 
-export AdmmAlg, admm_addscenario, admm_setnonantvars, admm_solve
+using Compat
+if !isless(VERSION, v"0.7.0")
+    using SparseArrays
+    using LinearAlgebra
+    using Printf
+end
 
-type Scenario
+export AdmmAlg, admm_addscenarios, admm_setnonantvars, admm_solve
+
+mutable struct Scenario
     m::JuMP.Model               # scenario model
     prob::Float64               # probability
     id::Integer
@@ -51,7 +59,7 @@ type Scenario
     qr::Vector{Int32}           # row indices of quadratic objective
     qc::Vector{Int32}           # column indices of quadratic objective
     qv::Vector{Float64}         # value of coefficients
-    scratch::Vector{Float64}    # scratch pad
+    scratch::Vector{Float64}    # scratch pad for objective update
     Vs::Vector{Vector{Float64}} # samples
 
     auglag::JuMP.Model          # Augmented Lagrangian model
@@ -61,12 +69,13 @@ type Scenario
     end
 end
 
-type AdmmAlg
+mutable struct AdmmAlg
     scen::Dict{Integer, Scenario} # scenarios
     nonant_names::Vector{Symbol}  # symbols of non-anticipativity variables
     nonant_inds::Vector{Int32}    # flattened indices of non-ant variables
     nonant_len::Int32             # the number of non-ant variables
     z::Vector{Float64}            # auxiliary variable for ADMM
+    mpi_scratch::Vector{Float64}  # scratch pad for MPI
 
     # Parameters
     auglag_mode::Symbol # either :SDM or :MIQP
@@ -77,7 +86,9 @@ type AdmmAlg
     alpha::Float64      # convex combination of xs and z
 
     function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6, alpha=1.0)
-	return new(Dict(), [], [], 0, [], mode, rho, kmax, tmax, tol, alpha)
+        MPI.Init()
+        finalizer(AdmmAlg->MPI.Finalize(), AdmmAlg)
+	return new(Dict(), [], [], 0, [], [], mode, rho, kmax, tmax, tol, alpha)
     end
 end
 
@@ -94,7 +105,7 @@ function init_nonantvars(admm::AdmmAlg)
     scen_model = collect(values(admm.scen))[1].m
 
     for name in admm.nonant_names
-        inds = getvariable(scen_model, name)
+        inds = getindex(scen_model, name)
 
         if isa(inds, Variable)
             admm.nonant_len += 1
@@ -124,9 +135,39 @@ function update_z(admm::AdmmAlg)
     # ---------------------------------------------------------------------
 
     fill!(admm.z, 0)
+
     for (key,scen) in admm.scen
         for (i,j) in enumerate(admm.nonant_inds)
             admm.z[i] += scen.prob*scen.x[j]
+        end
+    end
+
+    # ---------------------------------------------------------------------
+    # Gather all z values at each process and sum them up.
+    # ---------------------------------------------------------------------
+
+    # Use in-place version of Allgatherv to prevent allocation.
+    # This seems to be only available for Julia with version 0.7 or higher.
+    # If there's a memory issue, we may allow mpi_scratch to be allocated
+    # and used only for the root process.
+
+    fill!(admm.mpi_scratch, 0)
+    rank = MPI.Comm_rank(MPI.COMM_WORLD)
+    start = rank*admm.nonant_len
+
+    for i in 1:admm.nonant_len
+        admm.mpi_scratch[start + i] = admm.z[i]
+    end
+
+    MPI.Allgather!(admm.mpi_scratch, admm.nonant_len, MPI.COMM_WORLD)
+    nprocs = MPI.Comm_size(MPI.COMM_WORLD)
+    fill!(admm.z, 0)
+
+    for j in 1:nprocs
+        start = (j-1)*admm.nonant_len
+
+        for i in 1:admm.nonant_len
+            admm.z[i] += admm.mpi_scratch[start + i]
         end
     end
 end
@@ -146,6 +187,7 @@ end
 
 function init_scenarios(admm::AdmmAlg, auglag_solver)
     admm.z = zeros(admm.nonant_len)
+    admm.mpi_scratch = zeros(admm.nonant_len*MPI.Comm_size(MPI.COMM_WORLD))
 
     # ---------------------------------------------------------------------
     # For each scenario, initialize data structure and generate an initial
@@ -230,7 +272,7 @@ function init_auglag_sdm(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
 
     # 1.0 is for the convex combination constraint
     num_rows = scen.A.m + 1
-    A = sparse(collect(1:num_rows), ones(num_rows), [scen.A*s; 1.0]) # [I J V]
+    A = sparse(collect(1:num_rows), ones(Int64, num_rows), [scen.A*s; 1.0]) # [I J V]
     f = dot(scen.c, s)
 
     linconstr = scen.m.linconstr::Vector{LinearConstraint}
@@ -393,12 +435,18 @@ function update_linobjmiqp(admm::AdmmAlg, scen::Scenario)
 end
 
 function print_iterlog(admm::AdmmAlg, k::Integer, err::Float64=Inf)
-    if k % 50 == 0
-        @printf("Iteration Log\n")
-        @printf("%5s   %12s\n", "iter", "deviation")
-    end
 
-    @printf("%5d   %12.6e\n", k, (err==Inf) ? 0 : err)
+    # Only the root print the log.
+    rank = MPI.Comm_rank(MPI.COMM_WORLD)
+
+    if rank == 0
+        if k % 50 == 0
+            @printf("Iteration Log\n")
+            @printf("%5s   %12s\n", "iter", "deviation")
+        end
+
+        @printf("%5d   %12.6e\n", k, (err==Inf) ? 0 : err)
+    end
 end
 
 function print_summary(admm::AdmmAlg, k::Integer, err::Float64)
@@ -408,7 +456,10 @@ function print_summary(admm::AdmmAlg, k::Integer, err::Float64)
         objval += scen.prob*dot(scen.x, scen.c)
     end
 
-    @printf("Objective value: %10.6e", objval)
+    recvbuf = MPI.Allgather(objval, MPI.COMM_WORLD)
+    if MPI.Comm_rank(MPI.COMM_WORLD) == 0
+        @printf("Objective value: %10.6e", sum(recvbuf))
+    end
 end
 
 function solve_miqp(admm::AdmmAlg, scen::Scenario)
@@ -431,8 +482,34 @@ end
 # Exported functions
 # -------------------------------------------------------------------------
 
-function admm_addscenario(admm::AdmmAlg, s::Integer, p::Float64, m::JuMP.Model)
-    admm.scen[s] = Scenario(m, p, s)
+function admm_addscenarios(admm::AdmmAlg, ns::Integer, p::Vector{Float64},
+                           create_scenario::Function)
+    rank = MPI.Comm_rank(MPI.COMM_WORLD)
+    nprocs = MPI.Comm_size(MPI.COMM_WORLD)
+
+    if ns < nprocs
+        if rank == 0
+            println("ERROR: # of scenarios (", ns, ") is less than ",
+                    "# of processes (", nprocs, ").")
+        end
+        return false
+    end
+
+    if ns != length(p)
+        if rank == 0
+            println("ERROR: # of scenarios != size of probability array.")
+        end
+        return false
+    end
+
+    for s in 1:ns
+        if s % nprocs == rank
+            m = create_scenario(s)
+            admm.scen[s] = Scenario(m, p[s], s)
+        end
+    end
+
+    return true
 end
 
 function admm_setnonantvars(admm::AdmmAlg, names::Vector{Symbol})
@@ -480,7 +557,9 @@ function admm_solve(admm::AdmmAlg, solver=CplexSolver())
 		err += scen.prob*(scen.x[admm.nonant_inds[i]] - admm.z[i])^2
 	    end
         end
-        err = sqrt(err)
+
+        errbuf = MPI.Allgather(err, MPI.COMM_WORLD)
+        err = sqrt(sum(errbuf))
 
         update_z(admm)
         update_w(admm)

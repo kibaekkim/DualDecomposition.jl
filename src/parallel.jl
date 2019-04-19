@@ -30,12 +30,7 @@ function partition(part)
     global partitionlist = mylist[myid+1]
 end
 
-function reduce(x::Array{Float64,1})
-    counts = Cint[size(mylist[i],1) for i in 1:size(mylist,1)]
-    res=MPI.Allgatherv(x, counts, MPI.COMM_WORLD)
-end
-
-function reduce(x::Array{Int64,1})
+function reduce(x::Array{T,1}) where {T<:Number}
     counts = Cint[size(mylist[i],1) for i in 1:size(mylist,1)]
     res=MPI.Allgatherv(x, counts, MPI.COMM_WORLD)
 end

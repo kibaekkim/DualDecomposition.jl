@@ -39,9 +39,9 @@ if !isless(VERSION,v"0.7.0")
     using Random
 end
 
-using ADMM
 using JuMP
 using CPLEX
+using JuDD
 
 function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1;admm_options...)
 

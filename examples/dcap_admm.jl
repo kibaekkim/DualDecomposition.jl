@@ -38,8 +38,7 @@ end
 
 using JuMP
 using CPLEX
-using ADMM
-using Random
+using JuDD
 
 function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1;admm_options...)
 

@@ -1,6 +1,6 @@
 using JuMP
 using CPLEX
-using ADMM
+using JuDD
 
 const NS = 3  # number of scenarios
 const probability = ones(3) / 3

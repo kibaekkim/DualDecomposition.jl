@@ -34,9 +34,18 @@ Parameters (scenario):
 using JuMP
 using CPLEX
 using ADMM
+using Compat
+
+if !isless(VERSION, v"0.7.0")
+    using Random
+end
 
 function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1;admm_options...)
-    srand(seed)
+    if !isless(VERSION, v"0.7.0")
+	Random.seed!(seed)
+    else
+        srand(seed)
+    end
 
     # Create ADMM instance.
     admm = ADMM.AdmmAlg(;admm_options...)

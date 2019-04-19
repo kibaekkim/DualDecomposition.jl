@@ -38,9 +38,16 @@ using MathProgBase
 using CPLEX
 using MPI
 
+using Compat
+if !isless(VERSION, v"0.7.0")
+    using SparseArrays
+    using LinearAlgebra
+    using Printf
+end
+
 export AdmmAlg, admm_addscenarios, admm_setnonantvars, admm_solve
 
-type Scenario
+mutable struct Scenario
     m::JuMP.Model               # scenario model
     prob::Float64               # probability
     id::Integer
@@ -62,7 +69,7 @@ type Scenario
     end
 end
 
-type AdmmAlg
+mutable struct AdmmAlg
     scen::Dict{Integer, Scenario} # scenarios
     nonant_names::Vector{Symbol}  # symbols of non-anticipativity variables
     nonant_inds::Vector{Int32}    # flattened indices of non-ant variables
@@ -80,7 +87,7 @@ type AdmmAlg
 
     function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6, alpha=1.0)
         MPI.Init()
-        finalizer(AdmmAlg, AdmmAlg->MPI.Finalize())
+        finalizer(AdmmAlg->MPI.Finalize(), AdmmAlg)
 	return new(Dict(), [], [], 0, [], [], mode, rho, kmax, tmax, tol, alpha)
     end
 end
@@ -128,43 +135,9 @@ function update_z(admm::AdmmAlg)
     # ---------------------------------------------------------------------
 
     fill!(admm.z, 0)
-
     for (key,scen) in admm.scen
         for (i,j) in enumerate(admm.nonant_inds)
             admm.z[i] += scen.prob*scen.x[j]
-        end
-    end
-
-    # ---------------------------------------------------------------------
-    # Gather all z values at each process and sum them up.
-    # ---------------------------------------------------------------------
-
-    #=
-    # It seems that there's no in-place version of Allgatherv for Julia v0.4,
-    # whereas there is for Julia v0.7 or higher. The following code may be
-    # used in that case.
-
-    fill!(admm.mpi_scratch, 0)
-    rank = MPI.Comm_rank(MPI.COMM_WORLD)
-    start = rank*admm.nonant_len
-
-    for i in 1:admm.nonant_len
-        admm.mpi_scratch[start + i] = admm.z[i]
-    end
-
-    MPI.Allgather!(admm.mpi_scratch, admm.nonant_len, MPI.COMM_WORLD)
-    =#
-
-    recvbuf = MPI.Allgather(admm.z, admm.nonant_len, MPI.COMM_WORLD)
-    nprocs = MPI.Comm_size(MPI.COMM_WORLD)
-    fill!(admm.z, 0)
-
-    for j in 1:nprocs
-        start = (j-1)*admm.nonant_len
-
-        for i in 1:admm.nonant_len
-            # admm.z[i] += admm.mpi_scratch[start + i]
-            admm.z[i] += recvbuf[start + i]
         end
     end
 end
@@ -184,7 +157,6 @@ end
 
 function init_scenarios(admm::AdmmAlg, auglag_solver)
     admm.z = zeros(admm.nonant_len)
-    admm.mpi_scratch = zeros(admm.nonant_len*MPI.Comm_size(MPI.COMM_WORLD))
 
     # ---------------------------------------------------------------------
     # For each scenario, initialize data structure and generate an initial
@@ -432,18 +404,12 @@ function update_linobjmiqp(admm::AdmmAlg, scen::Scenario)
 end
 
 function print_iterlog(admm::AdmmAlg, k::Integer, err::Float64=Inf)
-
-    # Only the root print the log.
-    rank = MPI.Comm_rank(MPI.COMM_WORLD)
-
-    if rank == 0
-        if k % 50 == 0
-            @printf("Iteration Log\n")
-            @printf("%5s   %12s\n", "iter", "deviation")
-        end
-
-        @printf("%5d   %12.6e\n", k, (err==Inf) ? 0 : err)
+    if k % 50 == 0
+        @printf("Iteration Log\n")
+        @printf("%5s   %12s\n", "iter", "deviation")
     end
+
+    @printf("%5d   %12.6e\n", k, (err==Inf) ? 0 : err)
 end
 
 function print_summary(admm::AdmmAlg, k::Integer, err::Float64)
@@ -453,10 +419,7 @@ function print_summary(admm::AdmmAlg, k::Integer, err::Float64)
         objval += scen.prob*dot(scen.x, scen.c)
     end
 
-    recvbuf = MPI.Allgather(objval, MPI.COMM_WORLD)
-    if MPI.Comm_rank(MPI.COMM_WORLD) == 0
-        @printf("Objective value: %10.6e", sum(recvbuf))
-    end
+    @printf("Objective value: %10.6e", objval)
 end
 
 function solve_miqp(admm::AdmmAlg, scen::Scenario)
@@ -479,34 +442,8 @@ end
 # Exported functions
 # -------------------------------------------------------------------------
 
-function admm_addscenarios(admm::AdmmAlg, ns::Integer, p::Vector{Float64},
-                           create_scenario::Function)
-    rank = MPI.Comm_rank(MPI.COMM_WORLD)
-    nprocs = MPI.Comm_size(MPI.COMM_WORLD)
-
-    if ns < nprocs
-        if rank == 0
-            println("ERROR: # of scenarios (", ns, ") is less than ",
-                    "# of processes (", nprocs, ").")
-        end
-        return false
-    end
-
-    if ns != length(p)
-        if rank == 0
-            println("ERROR: # of scenarios != size of probability array.")
-        end
-        return false
-    end
-
-    for s in 1:ns
-        if s % nprocs == rank
-            m = create_scenario(s)
-            admm.scen[s] = Scenario(m, p[s], s)
-        end
-    end
-
-    return true
+function admm_addscenario(admm::AdmmAlg, s::Integer, p::Float64, m::JuMP.Model)
+    admm.scen[s] = Scenario(m, p, s)
 end
 
 function admm_setnonantvars(admm::AdmmAlg, names::Vector{Symbol})
@@ -554,9 +491,7 @@ function admm_solve(admm::AdmmAlg, solver=CplexSolver())
 		err += scen.prob*(scen.x[admm.nonant_inds[i]] - admm.z[i])^2
 	    end
         end
-
-        errbuf = MPI.Allgather(err, MPI.COMM_WORLD)
-        err = sqrt(sum(errbuf))
+        err = sqrt(err)
 
         update_z(admm)
         update_w(admm)

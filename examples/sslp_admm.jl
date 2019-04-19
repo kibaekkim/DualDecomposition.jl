@@ -38,8 +38,18 @@ using ADMM
 using JuMP
 using CPLEX
 
+using Compat
+
+if !isless(VERSION, v"0.7.0")
+    using Random
+end
+
 function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1;admm_options...)
-    srand(seed)
+    if !isless(VERSION, v"0.7.0")
+	Random.seed!(seed)
+    else
+	srand(seed)
+    end
 
     # Create JuDD instance.
     admm = ADMM.AdmmAlg(;admm_options...)

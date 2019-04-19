@@ -74,7 +74,7 @@ function solve(solver; master_alrogithm = :ProximalBundle)
 	bundle = BM.ProximalDualModel(nvars, LD.num_scenarios, solveLagrangeDual, true)
 
 	# set the underlying solver Ipopt or PipsNlp
-	bundle.solver = "PipsNlp"
+	bundle.solver = "Ipopt"
 
 	# parameters for BundleMethod
 	# bundle.M_g = max(500, dv.nvars + nmodels + 1)

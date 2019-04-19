@@ -13,7 +13,7 @@ include("parallel.jl")
 
 const BM = BundleMethod
 
-type LagrangeDuals
+mutable struct LagrangeDuals
 	num_scenarios::Int64			# total number of scenarios
 	probability::Dict{Int64,Float64}	# probabilities
 	model::Dict{Int64,Any}		# Dictionary of dual subproblems
@@ -28,8 +28,8 @@ type LagrangeDuals
 		)
 		parallel.init()
 		parallel.partition(n)
-		finalizer(LagrangeDuals, LagrangeDuals->parallel.finalize())
 		global LD = new(n, Dict(), Dict(), [], 0, [], algo)
+		finalizer(LagrangeDuals->parallel.finalize(), LagrangeDuals)
 		return
 	end
 end
@@ -56,7 +56,7 @@ function solve(solver; master_alrogithm = :ProximalBundle)
 	some_model = collect(values(LD.model))[1]
 
 	for v in LD.nonanticipativity_vars
-		vi = getvariable(some_model, v)
+		vi = getindex(some_model, v)
 
 		# Get the dimension of nonanticipativity variables
 		LD.num_nonant_vars += length(vi)
@@ -73,9 +73,8 @@ function solve(solver; master_alrogithm = :ProximalBundle)
 	# Create bundle method instance
 	bundle = BM.ProximalDualModel(nvars, LD.num_scenarios, solveLagrangeDual, true)
 
-	# set the underlying solver
-	# JuMP.setsolver(bundle.m, solver)
-	bundle.solver = solver
+	# set the underlying solver Ipopt or PipsNlp
+	bundle.solver = "Ipopt"
 
 	# parameters for BundleMethod
 	# bundle.M_g = max(500, dv.nvars + nmodels + 1)
@@ -99,7 +98,7 @@ function solveLagrangeDual(λ::Array{Float64,1})
 	# output
 	sindices = Int64[]
 	objvals = Float64[]
-	subgrads = Array{Float64,2}(0, length(λ))
+	subgrads = Array{Float64,2}(undef, 0, length(λ))
 
 	for s in parallel.getpartition()
 		# get the current model

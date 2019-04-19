@@ -2,17 +2,20 @@
 This is a MIQP variant of dcap.jl. See dcap.jl.
 =#
 
+if !isless(VERSION,v"0.7.0")
+    using Random
+	srand(s) = Random.seed!(s)
+end
 using JuDD
 using JuMP, Ipopt
 using CPLEX
-using Compat
 
 function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
 
     # Create JuDD instance.
     JuDD.LagrangeDuals(nS)
 
-    Compat.Random.seed!(seed)
+	srand(seed)
 
     global sR = 1:nR
     global sN = 1:nN
@@ -36,7 +39,7 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
     JuDD.set_nonanticipativity_vars(nonanticipativity_vars())
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    JuDD.solve(IpoptSolver(print_level=5), master_alrogithm = :ProximalDualBundle)
+    JuDD.solve(IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
 end
 
 # This creates a Lagrange dual problem for each scenario s.

@@ -34,11 +34,10 @@ Parameters (scenario):
   h[i,s]: 1 if client i is present in scenario s, 0 otherwise
 =#
 
-using Compat
 if !isless(VERSION,v"0.7.0")
     using Random
+	srand(s) = Random.seed!(s)
 end
-
 using JuMP
 using CPLEX
 using JuDD
@@ -48,11 +47,7 @@ function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1;admm_options...)
     # Create JuDD instance.
     admm = ADMM.AdmmAlg(;admm_options...)
 
-    if !isless(VERSION,v"0.7.0")
-	Random.seed!(seed)
-    else
-        srand(seed)
-    end
+    srand(seed)
 
     global sJ = 1:nJ
     global sI = 1:nI

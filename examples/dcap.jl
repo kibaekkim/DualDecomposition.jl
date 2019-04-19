@@ -31,6 +31,10 @@ Parameters (scenario):
   d[j,t,s]: capacity required for to perform task j in period t in scenario s
 =#
 
+if !isless(VERSION,v"0.7.0")
+    using Random
+	srand(s) = Random.seed!(s)
+end
 using JuDD
 using JuMP, Ipopt
 using GLPKMathProgInterface

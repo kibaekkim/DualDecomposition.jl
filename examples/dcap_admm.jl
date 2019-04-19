@@ -31,24 +31,26 @@ Parameters (scenario):
   d[j,t,s]: capacity required for to perform task j in period t in scenario s
 =#
 
-using JuMP
-using CPLEX
-using ADMM
 using Compat
 
 if !isless(VERSION, v"0.7.0")
     using Random
 end
 
+using JuMP
+using CPLEX
+using JuDD
+
 function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1;admm_options...)
-    if !isless(VERSION, v"0.7.0")
+
+    # Create ADMM instance.
+    admm = ADMM.AdmmAlg(;admm_options...)
+
+    if !isless(VERSION,v"0.7.0")
 	Random.seed!(seed)
     else
         srand(seed)
     end
-
-    # Create ADMM instance.
-    admm = ADMM.AdmmAlg(;admm_options...)
 
     global sR = 1:nR
     global sN = 1:nN
@@ -87,12 +89,12 @@ function create_scenario_model(s::Int64)
     @variable(model, y[i=sR,j=sN,t=sT], Bin)
     @variable(model, z[j=sN,t=sT], Bin)
     @objective(model, Min,
-	       sum{a[i,t]*x[i,t] + b[i,t]*u[i,t], i in sR, t in sT}
-	       + sum{c[i,j,t,s]*y[i,j,t], i in sR, j in sN, t in sT}
-	       + sum{c0[j,t,s]*z[j,t], j in sN, t in sT})
+          sum(a[i,t]*x[i,t] + b[i,t]*u[i,t] for i in sR for t in sT)
+        + sum(c[i,j,t,s]*y[i,j,t] for i in sR for j in sN for t in sT)
+        + sum(c0[j,t,s]*z[j,t] for j in sN for t in sT))
     @constraint(model, [i=sR,t=sT], x[i,t] - u[i,t] <= 0)
-    @constraint(model, [i=sR,t=sT], -sum{x[i,tau], tau in 1:t} + sum{d[j,t,s]*y[i,j,t], j in sN} <= 0)
-    @constraint(model, [j=sN,t=sT], sum{y[i,j,t], i in sR} + z[j,t] == 1)
+    @constraint(model, [i=sR,t=sT], -sum(x[i,tau] for tau in 1:t) + sum(d[j,t,s]*y[i,j,t] for j in sN) <= 0)
+    @constraint(model, [j=sN,t=sT], sum(y[i,j,t] for i in sR) + z[j,t] == 1)
 
     return model
 end

@@ -13,6 +13,16 @@ include("parallel.jl")
 
 const BM = BundleMethod
 
+include("ADMM.jl")
+
+using .ADMM
+
+export
+	ADMM,
+    admm_addscenarios,
+    admm_setnonantvars,
+    admm_solve
+
 mutable struct LagrangeDuals
 	num_scenarios::Int64			# total number of scenarios
 	probability::Dict{Int64,Float64}	# probabilities
@@ -24,7 +34,7 @@ mutable struct LagrangeDuals
 	function LagrangeDuals(n::Int64)
 		algo = Dict(
 			# :ProximalBundle => BM.ProximalMethod,
-			:ProximalDualBundle => BM.ProximalDualModel
+			:ProximalDualBundle => BM.ProximalDualMethod
 		)
 		parallel.init()
 		parallel.partition(n)
@@ -71,7 +81,7 @@ function solve(solver; master_alrogithm = :ProximalBundle)
 	nvars = LD.num_nonant_vars * LD.num_scenarios
 
 	# Create bundle method instance
-	bundle = BM.ProximalDualModel(nvars, LD.num_scenarios, solveLagrangeDual, true)
+	bundle = BM.Model{LD.master_algorithms[master_alrogithm]}(nvars, LD.num_scenarios, solveLagrangeDual, true)
 
 	# set the underlying solver Ipopt or PipsNlp
 	bundle.solver = "Ipopt"

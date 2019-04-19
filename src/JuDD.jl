@@ -8,8 +8,17 @@ module JuDD
 
 using JuMP
 using BundleMethod
-
 const BM = BundleMethod
+
+include("ADMM.jl")
+
+using .ADMM
+
+export
+	ADMM,
+    admm_addscenario,
+    admm_setnonantvars,
+    admm_solve
 
 mutable struct LagrangeDuals
 	num_scenarios::Int64			# total number of scenarios

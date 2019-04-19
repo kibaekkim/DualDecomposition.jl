@@ -35,10 +35,11 @@ module ADMM
 
 using JuMP
 using MathProgBase
-using CPLEX
+if !isless(VERSION,v"0.7.0")
 using LinearAlgebra
 using SparseArrays
 using Printf
+end
 
 export
     admm_addscenario,
@@ -449,7 +450,7 @@ function admm_setnonantvars(admm::AdmmAlg, names::Vector{Symbol})
     admm.nonant_names = names
 end
 
-function admm_solve(admm::AdmmAlg, solver=CplexSolver())
+function admm_solve(admm::AdmmAlg, solver)
     if length(admm.scen) <= 0 || length(admm.nonant_names) <= 0
         println("empty scenarios or empty non-anticipativity variables.")
         return
@@ -502,5 +503,3 @@ function admm_solve(admm::AdmmAlg, solver=CplexSolver())
 end
 
 end # module ADMM
-
-

@@ -31,21 +31,14 @@ REPEAT the following steps.
 2. Find a step size \gamma (should be in a closed form).
 =#
 
-module ADMM
-
-using JuMP
-using MathProgBase
-using CPLEX
-using MPI
-
-using Compat
-if !isless(VERSION, v"0.7.0")
-    using SparseArrays
-    using LinearAlgebra
-    using Printf
+if !isless(VERSION,v"0.7.0")
+	using LinearAlgebra
+	using SparseArrays
+	using Printf
 end
 
-export AdmmAlg, admm_addscenarios, admm_setnonantvars, admm_solve
+using MathProgBase
+using MPI
 
 mutable struct Scenario
     m::JuMP.Model               # scenario model
@@ -69,7 +62,7 @@ mutable struct Scenario
     end
 end
 
-mutable struct AdmmAlg
+mutable struct AdmmAlg <: AbstractAlg
     scen::Dict{Integer, Scenario} # scenarios
     nonant_names::Vector{Symbol}  # symbols of non-anticipativity variables
     nonant_inds::Vector{Int32}    # flattened indices of non-ant variables
@@ -97,6 +90,7 @@ end
 ###########################################################################
 
 function init_nonantvars(admm::AdmmAlg)
+
     # ---------------------------------------------------------------------
     # Find out the flattened indices of non-anticipative variables.
     # Assume that each scenario has the same non-anticipative variables.
@@ -482,8 +476,8 @@ end
 # Exported functions
 # -------------------------------------------------------------------------
 
-function admm_addscenarios(admm::AdmmAlg, ns::Integer, p::Vector{Float64},
-                           create_scenario::Function)
+function add_scenario_models(admm::AdmmAlg, ns::Integer, p::Vector{Float64},
+                             create_scenario::Function)
     rank = MPI.Comm_rank(MPI.COMM_WORLD)
     nprocs = MPI.Comm_size(MPI.COMM_WORLD)
 
@@ -512,11 +506,11 @@ function admm_addscenarios(admm::AdmmAlg, ns::Integer, p::Vector{Float64},
     return true
 end
 
-function admm_setnonantvars(admm::AdmmAlg, names::Vector{Symbol})
+function set_nonanticipativity_vars(admm::AdmmAlg, names::Vector{Symbol})
     admm.nonant_names = names
 end
 
-function admm_solve(admm::AdmmAlg, solver=CplexSolver())
+function solve(admm::AdmmAlg, solver)
     if length(admm.scen) <= 0 || length(admm.nonant_names) <= 0
         println("empty scenarios or empty non-anticipativity variables.")
         return
@@ -570,7 +564,3 @@ function admm_solve(admm::AdmmAlg, solver=CplexSolver())
 
     print_summary(admm, k, err)
 end
-
-end # module ADMM
-
-

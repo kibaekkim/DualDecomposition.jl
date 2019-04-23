@@ -22,8 +22,8 @@ function main_farmer(; use_admm = false)
 	if use_admm
 		algo = AdmmAlg()
 	else
-	    algo = LagrangeDualAlg(nS)
-	end)
+	    algo = LagrangeDualAlg(NS)
+	end
 
     # Add Lagrange dual problem for each scenario s.
     for s in 1:NS

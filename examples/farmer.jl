@@ -1,5 +1,4 @@
-include("../src/JuDD.jl")
-using Main.JuDD
+using JuDD
 using JuMP, Ipopt
 using CPLEX
 

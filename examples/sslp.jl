@@ -38,8 +38,7 @@ if !isless(VERSION,v"0.7.0")
     using Random
 	srand(s) = Random.seed!(s)
 end
-include("../src/JuDD.jl")
-using Main.JuDD
+using JuDD
 using JuMP, Ipopt
 using CPLEX
 

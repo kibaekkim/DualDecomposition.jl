@@ -31,20 +31,12 @@ REPEAT the following steps.
 2. Find a step size \gamma (should be in a closed form).
 =#
 
-module ADMM
-
-using JuMP
-using MathProgBase
 if !isless(VERSION,v"0.7.0")
-using LinearAlgebra
-using SparseArrays
-using Printf
+	using LinearAlgebra
+	using SparseArrays
+	using Printf
 end
-
-export
-    admm_addscenario,
-    admm_setnonantvars,
-    admm_solve
+using MathProgBase
 
 mutable struct Scenario
     m::JuMP.Model               # scenario model
@@ -68,7 +60,7 @@ mutable struct Scenario
     end
 end
 
-mutable struct AdmmAlg
+mutable struct AdmmAlg <: AbstractAlg
     scen::Dict{Integer, Scenario} # scenarios
     nonant_names::Vector{Symbol}  # symbols of non-anticipativity variables
     nonant_inds::Vector{Int32}    # flattened indices of non-ant variables
@@ -442,15 +434,15 @@ end
 # Exported functions
 # -------------------------------------------------------------------------
 
-function admm_addscenario(admm::AdmmAlg, s::Integer, p::Float64, m::JuMP.Model)
+function add_scenario_model(admm::AdmmAlg, s::Integer, p::Float64, m::JuMP.Model)
     admm.scen[s] = Scenario(m, p, s)
 end
 
-function admm_setnonantvars(admm::AdmmAlg, names::Vector{Symbol})
+function set_nonanticipativity_vars(admm::AdmmAlg, names::Vector{Symbol})
     admm.nonant_names = names
 end
 
-function admm_solve(admm::AdmmAlg, solver)
+function solve(admm::AdmmAlg, solver)
     if length(admm.scen) <= 0 || length(admm.nonant_names) <= 0
         println("empty scenarios or empty non-anticipativity variables.")
         return
@@ -501,5 +493,3 @@ function admm_solve(admm::AdmmAlg, solver)
 
     print_summary(admm, k, err)
 end
-
-end # module ADMM

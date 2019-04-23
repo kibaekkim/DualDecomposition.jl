@@ -74,7 +74,7 @@ function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1; use_admm = false)
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
     if use_admm
-	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0))
+	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
     else
         JuDD.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
     end

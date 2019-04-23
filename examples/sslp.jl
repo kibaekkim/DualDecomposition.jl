@@ -34,15 +34,16 @@ Parameters (scenario):
   h[i,s]: 1 if client i is present in scenario s, 0 otherwise
 =#
 
+if !isless(VERSION,v"0.7.0")
+    using Random
+    srand(s) = Random.seed!(s)
+end
+
 using JuDD
 using JuMP, Ipopt
-using GLPKMathProgInterface
+using CPLEX
 
-function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
-
-    # Create JuDD instance.
-    JuDD.LagrangeDuals(nS)
-
+function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1; use_admm = false)
     srand(seed)
 
     global sJ = 1:nJ
@@ -58,34 +59,43 @@ function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
     global h = rand(0:1,nI,nS)
     Pr = ones(nS)/nS
 
-    # Add Lagrange dual problem for each scenario s.
-    for s in 1:nS
-        JuDD.add_Lagrange_dual_model(s, Pr[s], create_scenario_model)
+    # Create JuDD instance.
+    if use_admm
+	algo = AdmmAlg(;rho=5000, kmax=5000, tol=1.e-4)
+    else
+	algo = LagrangeDualAlg(nS)
     end
 
+    # Add Lagrange dual problem for each scenario s.
+    add_scenario_models(algo, nS, Pr, create_scenario_model)
+
     # Set nonanticipativity variables as an array of symbols.
-    JuDD.set_nonanticipativity_vars(nonanticipativity_vars())
+    set_nonanticipativity_vars(algo, nonanticipativity_vars())
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    JuDD.solve(IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
+    if use_admm
+	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
+    else
+        JuDD.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
+    end
 end
 
 # This creates a Lagrange dual problem for each scenario s.
 function create_scenario_model(s::Int64)
-    model = Model(solver=GLPKSolverMIP())
+    model = Model(solver=CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
 
     @variable(model, x[j=sJ], Bin)
     @variable(model, y[i=sI,j=sJ], Bin)
     @variable(model, y0[j=sJ] >= 0)
 
     @objective(model, Min,
-          sum(c[j]*x[j] for j in sJ)
-        - sum(q[i,j,s]*y[i,j] for i in sI for j in sJ)
-        + sum(q0[j]*y0[j] for j in sJ))
+          sum{c[j]*x[j], j in sJ}
+        - sum{q[i,j,s]*y[i,j], i in sI, j in sJ}
+        + sum{q0[j]*y0[j], j in sJ})
 
-    @constraint(model, sum(x[j] for j in sJ) <= v)
-    @constraint(model, [j=sJ], sum(d[i,j,s]*y[i,j] for i in sI) - y0[j] <= u*x[j])
-    @constraint(model, [i=sI], sum(y[i,j] for j in sJ) == h[i,s])
+    @constraint(model, sum{x[j], j in sJ} <= v)
+    @constraint(model, [j=sJ], sum{d[i,j,s]*y[i,j], i in sI} - y0[j] <= u*x[j])
+    @constraint(model, [i=sI], sum{y[i,j], j in sJ} == h[i,s])
 
     return model
 end
@@ -93,7 +103,7 @@ end
 # return the array of nonanticipativity variables
 nonanticipativity_vars() = [:x]
 
-main_sslp(10,50,50)
+main_sslp(10,50,50; use_admm=true)
 # main_sslp(10,50,100)
 # main_sslp(10,50,500)
 # main_sslp(10,50,1000)

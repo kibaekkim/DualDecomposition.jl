@@ -31,15 +31,16 @@ Parameters (scenario):
   d[j,t,s]: capacity required for to perform task j in period t in scenario s
 =#
 
+if !isless(VERSION,v"0.7.0")
+    using Random
+    srand(s) = Random.seed!(s)
+end
+
 using JuDD
 using JuMP, Ipopt
-using GLPKMathProgInterface
 using CPLEX
 
-function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
-
-    # Create JuDD instance.
-    JuDD.LagrangeDuals(nS)
+function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1; use_admm = false, admm_options...)
 
     srand(seed)
 
@@ -56,16 +57,25 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
     global d = rand(nN, nT, nS) .+ 0.5
     Pr = ones(nS)/nS
 
-    # Add Lagrange dual problem for each scenario s.
-    for s in 1:nS
-        JuDD.add_Lagrange_dual_model(s, Pr[s], create_scenario_model)
+    # Create JuDD instance.
+    if use_admm
+	algo = AdmmAlg(;rho=50)
+    else
+	algo = LagrangeDualAlg(nS)
     end
 
+    # Add Lagrange dual problem for each scenario s.
+    add_scenario_models(algo, nS, Pr, create_scenario_model)
+
     # Set nonanticipativity variables as an array of symbols.
-    JuDD.set_nonanticipativity_vars(nonanticipativity_vars())
+    set_nonanticipativity_vars(algo, nonanticipativity_vars())
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    JuDD.solve(IpoptSolver(print_level=5), master_alrogithm = :ProximalDualBundle)
+    if use_admm
+	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
+    else
+        JuDD.solve(algo, IpoptSolver(print_level=5), master_alrogithm = :ProximalDualBundle)
+    end
 end
 
 # This creates a Lagrange dual problem for each scenario s.
@@ -93,4 +103,4 @@ end
 # return the array of nonanticipativity variables
 nonanticipativity_vars() = [:x,:u]
 
-main_dcap(2,3,3,20)
+main_dcap(2,3,3,20; use_admm=true)

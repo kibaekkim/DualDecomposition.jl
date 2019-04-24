@@ -30,12 +30,10 @@ Parameters (general):
 Parameters (scenario):
   d[j,t,s]: capacity required for to perform task j in period t in scenario s
 =#
-
 if !isless(VERSION,v"0.7.0")
     using Random
-    srand(s) = Random.seed!(s)
+	srand(s) = Random.seed!(s)
 end
-
 using JuDD
 using JuMP, Ipopt
 using CPLEX
@@ -58,11 +56,11 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1; use_admm = f
     Pr = ones(nS)/nS
 
     # Create JuDD instance.
-    if use_admm
-	algo = AdmmAlg(;rho=50)
-    else
-	algo = LagrangeDualAlg(nS)
-    end
+	if use_admm
+		algo = AdmmAlg(;rho = 50)
+	else
+	    algo = LagrangeDualAlg(nS)
+	end
 
     # Add Lagrange dual problem for each scenario s.
     add_scenario_models(algo, nS, Pr, create_scenario_model)
@@ -71,11 +69,11 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1; use_admm = f
     set_nonanticipativity_vars(algo, nonanticipativity_vars())
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    if use_admm
-	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
-    else
-        JuDD.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
-    end
+	if use_admm
+    	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
+	else
+    	JuDD.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
+	end
 end
 
 # This creates a Lagrange dual problem for each scenario s.
@@ -90,9 +88,9 @@ function create_scenario_model(s::Int64)
     @variable(model, y[i=sR,j=sN,t=sT], Bin)
     @variable(model, z[j=sN,t=sT], Bin)
     @objective(model, Min,
-          sum(a[i,t]*x[i,t] + b[i,t]*u[i,t] for i in sR, t in sT)
-        + sum(c[i,j,t,s]*y[i,j,t] for i in sR, j in sN, t in sT)
-        + sum(c0[j,t,s]*z[j,t] for j in sN, t in sT))
+          sum(a[i,t]*x[i,t] + b[i,t]*u[i,t] for i in sR for t in sT)
+        + sum(c[i,j,t,s]*y[i,j,t] for i in sR for j in sN for t in sT)
+        + sum(c0[j,t,s]*z[j,t] for j in sN for t in sT))
     @constraint(model, [i=sR,t=sT], x[i,t] - u[i,t] <= 0)
     @constraint(model, [i=sR,t=sT], -sum(x[i,tau] for tau in 1:t) + sum(d[j,t,s]*y[i,j,t] for j in sN) <= 0)
     @constraint(model, [j=sN,t=sT], sum(y[i,j,t] for i in sR) + z[j,t] == 1)

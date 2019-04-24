@@ -1,5 +1,5 @@
 # JuDD.jl
-Dual Decomposition of Stochastic Programming in Julia
+Scenario Decomposition of Stochastic Programming in Julia
 
 This package can be installed by cloning this repository:
 ```julia

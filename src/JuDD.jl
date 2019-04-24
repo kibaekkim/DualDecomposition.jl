@@ -13,11 +13,11 @@ const BM = BundleMethod
 
 abstract type AbstractAlg end
 
-#include("LagrangeDual.jl")
+include("LagrangeDual.jl")
 include("ADMM.jl")
 
 export
-#    LagrangeDualAlg,
+    LagrangeDualAlg,
     AdmmAlg,
     add_scenario_model,
     add_scenario_models,

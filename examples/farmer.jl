@@ -19,11 +19,11 @@ const Minreq = [200 240 0]    # minimum crop requirement
 # This is the main function to solve the example by using dual decomposition.
 function main_farmer(; use_admm = false)
     # Create JuDD instance.
-    if use_admm
-	algo = AdmmAlg()
-    else
-	algo = LagrangeDualAlg(NS)
-    end
+	if use_admm
+		algo = AdmmAlg()
+	else
+	    algo = LagrangeDualAlg(NS)
+	end
 
     # Add Lagrange dual problem for each scenario s.
     add_scenario_models(algo, NS, probability, create_scenario_model)
@@ -32,11 +32,11 @@ function main_farmer(; use_admm = false)
     set_nonanticipativity_vars(algo, nonanticipativity_vars())
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    if use_admm
-	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
-    else
-	JuDD.solve(algo, IpoptSolver(print_level=0), master_algorithm=:ProximalBundle)
-    end
+	if use_admm
+    	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
+	else
+    	JuDD.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
+	end
 end
 
 # This creates a Lagrange dual problem for each scenario s.
@@ -59,4 +59,5 @@ end
 
 # return the array of nonanticipativity variables
 nonanticipativity_vars() = [:x]
+
 main_farmer()

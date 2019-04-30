@@ -78,10 +78,6 @@ function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
 
     # solve!
     BM.run(bundle)
-
-    # print solution
-    @show BM.getobjectivevalue(bundle)
-    @show BM.getsolution(bundle)
 end
 
 function solveLagrangeDual(λ::Array{Float64,1})

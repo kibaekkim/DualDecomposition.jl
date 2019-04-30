@@ -26,6 +26,10 @@ function add_scenario_model(LD::LagrangeDualAlg, s::Integer, p::Float64, model::
     LD.model[s] = model
 end
 
+function get_scenario_model(LD::LagrangeDualAlg, s::Integer)
+    return LD.model[s]
+end
+
 function set_nonanticipativity_vars(LD::LagrangeDualAlg, names::Vector{Symbol})
     LD.nonanticipativity_vars = names
 end

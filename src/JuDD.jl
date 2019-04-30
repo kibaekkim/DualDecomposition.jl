@@ -31,6 +31,10 @@ function add_scenario_model(alg::AbstractAlg, s::Integer, p::Float64, model::JuM
     print_warning()
 end
 
+function get_scenario_model(alg::AbstractAlg, s::Integer)
+    print_warning()
+end
+
 function set_nonanticipativity_vars(alg::AbstractAlg, names::Vector{Symbol})
     print_warning()
 end

@@ -438,6 +438,10 @@ function add_scenario_model(admm::AdmmAlg, s::Integer, p::Float64, m::JuMP.Model
     admm.scen[s] = Scenario(m, p, s)
 end
 
+function get_scenario_model(admm::AdmmAlg, s::Integer)
+    return admm.scen[s].m
+end
+
 function set_nonanticipativity_vars(admm::AdmmAlg, names::Vector{Symbol})
     admm.nonant_names = names
 end

@@ -68,7 +68,7 @@ function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
 
     # Scale the objective coefficients by probability
     for (s,m) in LD.model
-        affobj = getobjective(m).aff
+        affobj = m.obj.aff
         affobj.coeffs *= LD.probability[s]
     end
 
@@ -91,7 +91,7 @@ function solveLagrangeDual(λ::Array{Float64,1})
         subgrad = zeros(length(λ))
 
         # Get the affine part of objective function
-        affobj = getobjective(m).aff
+        affobj = m.obj.aff
 
         # Change objective coefficients
         start_index = (s - 1) * LD.num_nonant_vars + 1

@@ -28,12 +28,12 @@ function print_warning()
     Compat.@warn("This is an abstract function.")
 end
 
-function add_scenario_model(alg::AbstractAlg, s::Integer, p::Float64, model::JuMP.Model)
+function add_scenario_models(LD::AbstractAlg, ns::Integer, p::Vector{Float64},
+        create_scenario::Function)
     print_warning()
 end
 
-function add_scenario_models(alg::AbstractAlg, ns::Integer, p::Vector{Float64},
-			     create_scenario::Function)
+function get_scenario_model(alg::AbstractAlg, s::Integer)
     print_warning()
 end
 

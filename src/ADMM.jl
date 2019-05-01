@@ -506,6 +506,10 @@ function add_scenario_models(admm::AdmmAlg, ns::Integer, p::Vector{Float64},
     return true
 end
 
+function get_scenario_model(admm::AdmmAlg, s::Integer)
+    return admm.scen[s].m
+end
+
 function set_nonanticipativity_vars(admm::AdmmAlg, names::Vector{Symbol})
     admm.nonant_names = names
 end

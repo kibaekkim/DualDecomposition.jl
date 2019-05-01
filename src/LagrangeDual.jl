@@ -33,6 +33,10 @@ function add_scenario_models(LD::LagrangeDualAlg, ns::Integer, p::Vector{Float64
 	end
 end
 
+function get_scenario_model(LD::LagrangeDualAlg, s::Integer)
+    return LD.model[s]
+end
+
 function set_nonanticipativity_vars(LD::LagrangeDualAlg, names::Vector{Symbol})
     LD.nonanticipativity_vars = names
 end
@@ -75,16 +79,12 @@ function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
 
     # Scale the objective coefficients by probability
     for (s,m) in LD.model
-        affobj = getobjective(m).aff
+        affobj = m.obj.aff
         affobj.coeffs *= LD.probability[s]
     end
 
     # solve!
     BM.run(bundle)
-
-    # print solution
-    @show BM.getobjectivevalue(bundle)
-    @show BM.getsolution(bundle)
 end
 
 function solveLagrangeDual(λ::Array{Float64,1})
@@ -103,7 +103,7 @@ function solveLagrangeDual(λ::Array{Float64,1})
 		subgrad = zeros(length(λ))
 
 		# Get the affine part of objective function
-		affobj = getobjective(m).aff
+		affobj = m.obj.aff
 
 		# Change objective coefficients
 		start_index = (s - 1) * LD.num_nonant_vars + 1
@@ -144,5 +144,5 @@ function solveLagrangeDual(λ::Array{Float64,1})
 		end
 	end
     objvals2=parallel.reduce(objvals)
-    return -objvals2, -subgrads	
+    return -objvals2, -subgrads
 end

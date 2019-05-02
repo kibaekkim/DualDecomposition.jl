@@ -78,9 +78,12 @@ mutable struct AdmmAlg <: AbstractAlg
     tol::Float64        # convergence tolerance
     alpha::Float64      # convex combination of xs and z
 
-    function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6, alpha=1.0)
-        MPI.Init()
-        finalizer(AdmmAlg->MPI.Finalize(), AdmmAlg)
+    function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6, alpha=1.0,
+            has_mpi_comm=false)
+        if !has_mpi_comm
+            MPI.Init()
+            finalizer(AdmmAlg->MPI.Finalize(), AdmmAlg)
+        end
 	return new(Dict(), [], [], 0, [], [], mode, rho, kmax, tmax, tol, alpha)
     end
 end

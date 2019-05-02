@@ -12,15 +12,17 @@ mutable struct LagrangeDualAlg <: AbstractAlg
     maxiter::Integer    # maximum number of iterations
     tol::Float64         # convergence tolerance
 
-    function LagrangeDualAlg(n::Int64; maxiter=1000, tol=1.e-4)
+    function LagrangeDualAlg(n::Int64; maxiter=1000, tol=1.e-4, has_mpi_comm=false)
         algo = Dict(
             :ProximalBundle => BM.ProximalMethod,
             :ProximalDualBundle => BM.ProximalDualMethod
         )
-        parallel.init()
+        if !has_mpi_comm
+            parallel.init()
+            finalizer(LagrangeDualAlg->parallel.finalize(), LagrangeDualAlg)
+        end
         parallel.partition(n)
         global LD = new(n, Dict(), Dict(), [], 0, [], algo, maxiter, tol)
-        finalizer(LagrangeDualAlg->parallel.finalize(), LagrangeDualAlg)
         return LD
     end
 end

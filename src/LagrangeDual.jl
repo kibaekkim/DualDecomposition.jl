@@ -72,7 +72,7 @@ function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
     bundle = BM.Model{LD.master_algorithms[master_alrogithm]}(nvars, LD.num_scenarios, solveLagrangeDual, true)
 
 	# set the underlying solver Ipopt or PipsNlp
-	bundle.solver = "Ipopt"
+    bundle.solver = solver
 
     # parameters for BundleMethod
     # bundle.M_g = max(500, dv.nvars + nmodels + 1)

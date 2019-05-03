@@ -75,7 +75,7 @@ function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1; use_admm = false)
 	if use_admm
     	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
 	else
-    	JuDD.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
+    	JuDD.solve(algo, "PipsNlp", master_alrogithm = :ProximalDualBundle)
 	end
 end
 

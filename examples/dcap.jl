@@ -72,7 +72,7 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1; use_admm = f
 	if use_admm
     	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
 	else
-    	JuDD.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
+    	JuDD.solve(algo, "PipsNlp", master_alrogithm = :ProximalDualBundle)
 	end
 end
 
@@ -101,4 +101,4 @@ end
 # return the array of nonanticipativity variables
 nonanticipativity_vars() = [:x,:u]
 
-main_dcap(2,3,3,20; use_admm=true)
+main_dcap(2,3,3,20; use_admm=false)

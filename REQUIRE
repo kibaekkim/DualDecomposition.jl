@@ -1,6 +1,0 @@
-julia 0.4.7
-JuMP 0.14.2
-BundleMethod
-MathProgBase
-Compat
-MPI

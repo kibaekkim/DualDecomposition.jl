@@ -7,6 +7,10 @@ mutable struct LagrangeDualAlg <: AbstractAlg
     num_nonant_vars::Int64
     nonant_indices::Array{Int64,1}
     master_algorithms::Dict{Symbol,Type}
+    bestLB::Float64
+
+    # Subproblem solution values
+    colVals::Dict{Int64,Array{Float64,1}}
 
     # parameters
     maxiter::Integer    # maximum number of iterations
@@ -22,7 +26,7 @@ mutable struct LagrangeDualAlg <: AbstractAlg
             finalizer(LagrangeDualAlg->parallel.finalize(), LagrangeDualAlg)
         end
         parallel.partition(n)
-        global LD = new(n, Dict(), Dict(), [], 0, [], algo, maxiter, tol)
+        global LD = new(n, Dict(), Dict(), [], 0, [], algo, -Inf, Dict(), maxiter, tol)
         return LD
     end
 end
@@ -87,6 +91,11 @@ function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
 
     # solve!
     BM.run(bundle)
+
+    # Store the best known subproblem solutions
+    for s in parallel.getpartition()
+        LD.model[s].colVal = copy(LD.colVals[s])
+    end
 end
 
 function solveLagrangeDual(λ::Array{Float64,1})
@@ -146,5 +155,13 @@ function solveLagrangeDual(λ::Array{Float64,1})
         end
     end
     objvals2=parallel.reduce(objvals)
+
+    # Do we have a better solution found?
+    if sum(objvals2) >= 1.0001 * LD.bestLB
+        LD.bestLB = sum(objvals2)
+        for s in parallel.getpartition()
+            LD.colVals[s] = copy(LD.model[s].colVal)
+        end
+    end
     return -objvals2, -subgrads
 end

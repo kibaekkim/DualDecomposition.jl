@@ -1,0 +1,4 @@
+[deps]
+BundleMethod = "03bf20df-d8a0-5746-8978-d623d54f279b"
+StructJuMP = "34f15cae-5318-50c9-93d3-9feadd34e321"
+StructJuMPSolverInterface = "7a00d66c-3a07-54c1-b1e3-917bd47595ee"

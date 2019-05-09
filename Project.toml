@@ -1,3 +1,6 @@
+name = "JuDD"
+uuid = "23e7f524-354b-54ed-bb0a-79b99b2c75b2"
+
 [deps]
 BundleMethod = "03bf20df-d8a0-5746-8978-d623d54f279b"
 StructJuMP = "34f15cae-5318-50c9-93d3-9feadd34e321"

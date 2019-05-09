@@ -32,9 +32,9 @@ REPEAT the following steps.
 =#
 
 if !isless(VERSION,v"0.7.0")
-	using LinearAlgebra
-	using SparseArrays
-	using Printf
+    using LinearAlgebra
+    using SparseArrays
+    using Printf
 end
 
 using MathProgBase
@@ -84,7 +84,7 @@ mutable struct AdmmAlg <: AbstractAlg
             MPI.Init()
             finalizer(AdmmAlg->MPI.Finalize(), AdmmAlg)
         end
-	return new(Dict(), [], [], 0, [], [], mode, rho, kmax, tmax, tol, alpha)
+    return new(Dict(), [], [], 0, [], [], mode, rho, kmax, tmax, tol, alpha)
     end
 end
 
@@ -326,9 +326,9 @@ function solve_sdm(admm::AdmmAlg, scen::Scenario)
         in_m = internalmodel(scen.m)
 
         # Update the objective coefficients of the linearized AugLag.
-	for j in 1:length(scen.c)
-	    scen.scratch[j] = scen.c[j]
-	end
+    for j in 1:length(scen.c)
+        scen.scratch[j] = scen.c[j]
+    end
 
         for (i,j) in enumerate(admm.nonant_inds)
             scen.scratch[j] += ws[i]
@@ -421,7 +421,7 @@ function update_linobjmiqp(admm::AdmmAlg, scen::Scenario)
 
     num_vars = MathProgBase.numvar(scen.m)
     for j in 1:num_vars
-	scen.scratch[j] = scen.c[j]
+    scen.scratch[j] = scen.c[j]
     end
 
     for (i,j) in enumerate(admm.nonant_inds)
@@ -554,9 +554,9 @@ function solve(admm::AdmmAlg, solver)
         # Check the convergence: sqrt(∑ p(s)|x(s)-z|^2) <= ϵ
         err = 0
         for (key, scen) in admm.scen
-	    for i=1:length(admm.nonant_inds)
-		err += scen.prob*(scen.x[admm.nonant_inds[i]] - admm.z[i])^2
-	    end
+        for i=1:length(admm.nonant_inds)
+        err += scen.prob*(scen.x[admm.nonant_inds[i]] - admm.z[i])^2
+        end
         end
 
         errbuf = MPI.Allgather(err, MPI.COMM_WORLD)

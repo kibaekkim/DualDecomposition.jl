@@ -1,8 +1,8 @@
 include("parallel.jl")
 mutable struct LagrangeDualAlg <: AbstractAlg
-    num_scenarios::Int64			# total number of scenarios
-    probability::Dict{Int64,Float64}	# probabilities
-    model::Dict{Int64,JuMP.Model}		# Dictionary of dual subproblems
+    num_scenarios::Int64            # total number of scenarios
+    probability::Dict{Int64,Float64}    # probabilities
+    model::Dict{Int64,JuMP.Model}        # Dictionary of dual subproblems
     nonanticipativity_vars::Array{Symbol,1}
     num_nonant_vars::Int64
     nonant_indices::Array{Int64,1}
@@ -29,10 +29,10 @@ end
 
 function add_scenario_models(LD::LagrangeDualAlg, ns::Integer, p::Vector{Float64},
                              create_scenario::Function)
-	for s in parallel.getpartition()
-		LD.probability[s] = p[s]
-		LD.model[s] = create_scenario(s)
-	end
+    for s in parallel.getpartition()
+        LD.probability[s] = p[s]
+        LD.model[s] = create_scenario(s)
+    end
 end
 
 function get_scenario_model(LD::LagrangeDualAlg, s::Integer)
@@ -71,7 +71,7 @@ function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
     # Create bundle method instance
     bundle = BM.Model{LD.master_algorithms[master_alrogithm]}(nvars, LD.num_scenarios, solveLagrangeDual, true)
 
-	# set the underlying solver Ipopt or PipsNlp
+    # set the underlying solver Ipopt or PipsNlp
     bundle.solver = solver
 
     # parameters for BundleMethod
@@ -90,61 +90,61 @@ function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
 end
 
 function solveLagrangeDual(λ::Array{Float64,1})
-	# output
-	sindices = Int64[]
-	objvals = Float64[]
-	subgrads = Array{Float64,2}(undef, 0, length(λ))
+    # output
+    sindices = Int64[]
+    objvals = Float64[]
+    subgrads = Array{Float64,2}(undef, 0, length(λ))
 
-	for s in parallel.getpartition()
-		# get the current model
-		m = LD.model[s]
+    for s in parallel.getpartition()
+        # get the current model
+        m = LD.model[s]
 
-		# @show s
-		# initialize results
-		objval = 0.0
-		subgrad = zeros(length(λ))
+        # @show s
+        # initialize results
+        objval = 0.0
+        subgrad = zeros(length(λ))
 
-		# Get the affine part of objective function
-		affobj = m.obj.aff
+        # Get the affine part of objective function
+        affobj = m.obj.aff
 
-		# Change objective coefficients
-		start_index = (s - 1) * LD.num_nonant_vars + 1
-		for j in LD.nonant_indices
-			var = Variable(m, j)
-			if var in affobj.vars
-				objind = findfirst(x->x==var, affobj.vars)
-				affobj.coeffs[objind] += λ[start_index]
-			else
-				push!(affobj.vars, var)
-				push!(affobj.coeffs, λ[start_index])
-			end
-			start_index += 1
-		end
+        # Change objective coefficients
+        start_index = (s - 1) * LD.num_nonant_vars + 1
+        for j in LD.nonant_indices
+            var = Variable(m, j)
+            if var in affobj.vars
+                objind = findfirst(x->x==var, affobj.vars)
+                affobj.coeffs[objind] += λ[start_index]
+            else
+                push!(affobj.vars, var)
+                push!(affobj.coeffs, λ[start_index])
+            end
+            start_index += 1
+        end
 
-		# Solver the Lagrange dual
-		status = JuMP.solve(m)
+        # Solver the Lagrange dual
+        status = JuMP.solve(m)
 
-		if status == :Optimal
-			objval = getobjectivevalue(m)
-			for j in 1:LD.num_nonant_vars
-				subgrad[(s - 1) * LD.num_nonant_vars + j] = getvalue(Variable(m, LD.nonant_indices[j]))
-			end
-		end
+        if status == :Optimal
+            objval = getobjectivevalue(m)
+            for j in 1:LD.num_nonant_vars
+                subgrad[(s - 1) * LD.num_nonant_vars + j] = getvalue(Variable(m, LD.nonant_indices[j]))
+            end
+        end
 
-		# Add objective value and subgradient
-		push!(sindices, s)
-		push!(objvals, objval)
-		subgrads = vcat(subgrads, subgrad')
+        # Add objective value and subgradient
+        push!(sindices, s)
+        push!(objvals, objval)
+        subgrads = vcat(subgrads, subgrad')
 
-		# Reset objective coefficients
-		start_index = (s - 1) * LD.num_nonant_vars + 1
-		for j in LD.nonant_indices
-			var = Variable(m, j)
-			objind = findfirst(x->x==var, affobj.vars)
-			affobj.coeffs[objind] -= λ[start_index]
-			start_index += 1
-		end
-	end
+        # Reset objective coefficients
+        start_index = (s - 1) * LD.num_nonant_vars + 1
+        for j in LD.nonant_indices
+            var = Variable(m, j)
+            objind = findfirst(x->x==var, affobj.vars)
+            affobj.coeffs[objind] -= λ[start_index]
+            start_index += 1
+        end
+    end
     objvals2=parallel.reduce(objvals)
     return -objvals2, -subgrads
 end

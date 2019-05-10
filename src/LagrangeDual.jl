@@ -49,23 +49,25 @@ end
 
 function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
     # check the validity of LagrangeDualAlg
-    if LD.num_scenarios <= 0 || length(LD.model) <= 0 || length(LD.nonanticipativity_vars) == 0
+    if LD.num_scenarios <= 0 || length(LD.nonanticipativity_vars) == 0
         println("Invalid LagrangeDual structure.")
         return
     end
 
     # Get some model to retrieve model information
-    some_model = collect(values(LD.model))[1]
+    if length(LD.model) > 0
+        some_model = collect(values(LD.model))[1]
 
-    for v in LD.nonanticipativity_vars
-        vi = getindex(some_model, v)
+        for v in LD.nonanticipativity_vars
+            vi = getindex(some_model, v)
 
-        # Get the dimension of nonanticipativity variables
-        LD.num_nonant_vars += length(vi)
+            # Get the dimension of nonanticipativity variables
+            LD.num_nonant_vars += length(vi)
 
-        # Get the indices for nonanticipativity variables
-        for i in vi.innerArray
-            push!(LD.nonant_indices, i.col)
+            # Get the indices for nonanticipativity variables
+            for i in vi.innerArray
+                push!(LD.nonant_indices, i.col)
+            end
         end
     end
 

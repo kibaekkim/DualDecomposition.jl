@@ -14,9 +14,11 @@ mutable struct LagrangeDualAlg <: AbstractAlg
 
     # parameters
     maxiter::Integer    # maximum number of iterations
+    maxtime::Float64    # time limit
     tol::Float64         # convergence tolerance
 
-    function LagrangeDualAlg(n::Int64; maxiter=1000, tol=1.e-4, has_mpi_comm=false)
+    function LagrangeDualAlg(n::Int64;
+            maxiter=Int(1e+10), maxtime=1.e+10, tol=1.e-4, has_mpi_comm=false)
         algo = Dict(
             :ProximalBundle => BM.ProximalMethod,
             :ProximalDualBundle => BM.ProximalDualMethod
@@ -26,7 +28,8 @@ mutable struct LagrangeDualAlg <: AbstractAlg
             finalizer(LagrangeDualAlg->parallel.finalize(), LagrangeDualAlg)
         end
         parallel.partition(n)
-        global LD = new(n, Dict(), Dict(), [], 0, [], algo, -Inf, Dict(), maxiter, tol)
+        global LD = new(n, Dict(), Dict(), [], 0, [], algo, -Inf, Dict(),
+            maxiter, maxtime, tol)
         return LD
     end
 end
@@ -83,6 +86,7 @@ function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
     # parameters for BundleMethod
     # bundle.M_g = max(500, dv.nvars + nmodels + 1)
     bundle.maxiter = LD.maxiter
+    bundle.maxtime = LD.maxtime
     bundle.ext.ϵ_s = LD.tol
 
     # Scale the objective coefficients by probability

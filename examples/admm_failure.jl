@@ -1,15 +1,15 @@
 using JuMP
 using CPLEX
-using ADMM
+using JuDD
 
 function main(;admm_options...)
-    admm = ADMM.AdmmAlg(;admm_options...)
+    admm = AdmmAlg(;admm_options...)
     nS = 3
     Pr = ones(nS)/nS
 
-    admm_addscenarios(admm, nS, Pr, create_scenario_model)
-    admm_setnonantvars(admm, nonanticipativity_vars())
-    admm_solve(admm, CplexSolver(CPX_PARAM_SCRIND=0))
+    add_scenario_models(admm, nS, Pr, create_scenario_model)
+    set_nonanticipativity_vars(admm, nonanticipativity_vars())
+    JuDD.solve(admm, CplexSolver(CPX_PARAM_SCRIND=0))
 end
 
 function create_scenario_model(s::Integer)
@@ -35,4 +35,4 @@ end
 
 nonanticipativity_vars() = [:x]
 
-main(; mode=:SDM, rho=50, tmax=1)
+main(; mode=:SDM, kmax=20, rho=50, tmax=10)

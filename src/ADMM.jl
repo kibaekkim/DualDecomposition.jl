@@ -272,8 +272,17 @@ function init_auglag_sdm(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
 
     # 1.0 is for the convex combination constraint
     num_rows = scen.A.m + 1
-    A = sparse(collect(1:num_rows), ones(Int64, num_rows), [scen.A*s; 1.0]) # [I J V]
+    As = scen.A*s
+    for i=1:scen.A.m
+        if abs(As[i]) < 1.e-10
+            As[i] = 0.
+        end
+    end
+    A = sparse(collect(1:num_rows), ones(Int64, num_rows), [As; 1.0]) # [I J V]
     f = dot(scen.c, s)
+    if abs(f) < 1.e-10
+        f = 0.
+    end
 
     linconstr = scen.m.linconstr::Vector{LinearConstraint}
     num_rows = length(linconstr)
@@ -313,7 +322,16 @@ function add_sample(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
     in_auglag = internalmodel(scen.auglag)
     xs = s[admm.nonant_inds]
     f = dot(scen.c, s) + dot(scen.w, xs) - admm.rho*dot(admm.z, xs)
-    constr_coeffs = [ scen.A*s; 1.0 ] # 1.0 for the convex combination
+    if abs(f) < 1.e-10
+        f = 0.
+    end
+    As = scen.A*s
+    for i=1:scen.A.m
+        if abs(As[i]) < 1.e-10
+            As[i] = 0.
+        end
+    end
+    constr_coeffs = [ As; 1.0 ] # 1.0 for the convex combination
     MathProgBase.addvar!(in_auglag, collect(1:MathProgBase.numconstr(scen.m)+1),
                          constr_coeffs, 0, 1, f)
 

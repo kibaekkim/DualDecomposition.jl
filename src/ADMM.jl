@@ -32,9 +32,9 @@ REPEAT the following steps.
 =#
 
 if !isless(VERSION,v"0.7.0")
-	using LinearAlgebra
-	using SparseArrays
-	using Printf
+    using LinearAlgebra
+    using SparseArrays
+    using Printf
 end
 using MathProgBase
 
@@ -50,7 +50,7 @@ mutable struct Scenario
     qr::Vector{Int32}           # row indices of quadratic objective
     qc::Vector{Int32}           # column indices of quadratic objective
     qv::Vector{Float64}         # value of coefficients
-    scratch::Vector{Float64}    # scratch pad
+    scratch::Vector{Float64}    # scratch pad for objective update
     Vs::Vector{Vector{Float64}} # samples
 
     auglag::JuMP.Model          # Augmented Lagrangian model
@@ -75,9 +75,8 @@ mutable struct AdmmAlg <: AbstractAlg
     tol::Float64        # convergence tolerance
     alpha::Float64      # convex combination of xs and z
 
-    function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6,
-                     alpha=1.0)
-	return new(Dict(), [], [], 0, [], mode, rho, kmax, tmax, tol, alpha)
+    function AdmmAlg(;mode=:SDM, rho=1.0, kmax=1000, tmax=1, tol=1e-6, alpha=1.0)
+        return new(Dict(), [], [], 0, [], mode, rho, kmax, tmax, tol, alpha)
     end
 end
 
@@ -92,7 +91,7 @@ function init_nonantvars(admm::AdmmAlg)
     # Assume that each scenario has the same non-anticipative variables.
     # ---------------------------------------------------------------------
 
-    scen_model = iterate(admm.scen)[1].second.m
+    scen_model = collect(values(admm.scen))[1].m
 
     for name in admm.nonant_names
         inds = try
@@ -212,6 +211,9 @@ function update_quadsdm(admm::AdmmAlg, scen::Scenario)
         vs = scen.Vs[i][admm.nonant_inds]
         ss = s[admm.nonant_inds]
         qval = (admm.rho/2)*dot(vs,ss)
+        if i < length(scen.Vs)
+            qval *= 2
+        end
         push!(scen.qr, i)
         push!(scen.qc, num_samples)
         push!(scen.qv, qval)
@@ -238,7 +240,7 @@ function init_auglag_sdm(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
 
     # 1.0 is for the convex combination constraint
     num_rows = scen.A.m + 1
-    A = sparse(collect(1:num_rows), ones(num_rows), [scen.A*s; 1.0]) # [I J V]
+    A = sparse(collect(1:num_rows), ones(Int64, num_rows), [scen.A*s; 1.0]) # [I J V]
     f = dot(scen.c, s)
 
     linconstr = scen.m.linconstr::Vector{LinearConstraint}
@@ -266,6 +268,11 @@ function init_auglag_sdm(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
 end
 
 function add_sample(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
+    # Return if the point s is already in the set.
+    if in(s, scen.Vs)
+        return
+    end
+
     if !scen.auglag.internalModelLoaded
         init_auglag_sdm(admm, scen, s)
         return
@@ -285,9 +292,14 @@ end
 
 function solve_sdm(admm::AdmmAlg, scen::Scenario)
     xs = (1 - admm.alpha)*admm.z + admm.alpha*scen.x[admm.nonant_inds]
+    update_linobjsdm(admm, scen)
 
     for t in 1:admm.tmax
         if t > 1
+            # Terminate if the same solution was found
+            if sum(abs.(xs - scen.x[admm.nonant_inds])) < admm.tol
+                break
+            end
             xs = scen.x[admm.nonant_inds]
         end
 
@@ -411,7 +423,7 @@ function print_summary(admm::AdmmAlg, k::Integer, err::Float64)
         objval += scen.prob*dot(scen.x, scen.c)
     end
 
-    @printf("Objective value: %10.6e", objval)
+    @printf("Objective value: %10.6e\n", objval)
 end
 
 function solve_miqp(admm::AdmmAlg, scen::Scenario)
@@ -434,8 +446,12 @@ end
 # Exported functions
 # -------------------------------------------------------------------------
 
-function add_scenario_model(admm::AdmmAlg, s::Integer, p::Float64, m::JuMP.Model)
-    admm.scen[s] = Scenario(m, p, s)
+function add_scenario_models(admm::AdmmAlg, ns::Integer, p::Vector{Float64},
+                             create_scenario::Function)
+    for s in 1:ns
+        m = create_scenario(s)
+        admm.scen[s] = Scenario(m, p[s], s)
+    end
 end
 
 function get_scenario_model(admm::AdmmAlg, s::Integer)

@@ -467,13 +467,19 @@ function print_iterlog(admm::AdmmAlg, k::Integer, err::Float64=Inf)
     # Only the root print the log.
     rank = MPI.Comm_rank(MPI.COMM_WORLD)
 
+    objval = 0
+    for (key, scen) in admm.scen
+        objval += scen.prob*dot(scen.x, scen.c)
+    end
+    recvbuf = MPI.Allgather(objval, MPI.COMM_WORLD)
+
     if rank == 0
         if k % 50 == 0
             @printf("Iteration Log\n")
-            @printf("%5s   %12s\n", "iter", "deviation")
+            @printf("%5s   %12s   %12s\n", "iter", "objval", "deviation")
         end
 
-        @printf("%5d   %12.6e\n", k, (err==Inf) ? 0 : err)
+        @printf("%5d   %12.6e   %12.6e\n", k, sum(recvbuf), (err==Inf) ? 0 : err)
     end
 end
 

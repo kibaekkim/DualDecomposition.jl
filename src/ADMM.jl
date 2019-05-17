@@ -78,7 +78,7 @@ mutable struct AdmmAlg <: AbstractAlg
     tol::Float64        # convergence tolerance
     alpha::Float64      # convex combination of xs and z
 
-    function AdmmAlg(;mode=:MIQP, rho=1.0, kmax=1000, tmax=1, tol=1e-6, alpha=1.0,
+    function AdmmAlg(;mode=:SDM, rho=1.0, kmax=1000, tmax=1, tol=1e-6, alpha=1.0,
             has_mpi_comm=false)
         if !has_mpi_comm
             MPI.Init()
@@ -243,6 +243,9 @@ function update_quadsdm(admm::AdmmAlg, scen::Scenario)
         vs = scen.Vs[i][admm.nonant_inds]
         ss = s[admm.nonant_inds]
         qval = (admm.rho/2)*dot(vs,ss)
+        if i < length(scen.Vs)
+            qval *= 2
+        end
         push!(scen.qr, i)
         push!(scen.qc, num_samples)
         push!(scen.qv, qval)
@@ -297,6 +300,11 @@ function init_auglag_sdm(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
 end
 
 function add_sample(admm::AdmmAlg, scen::Scenario, s::Vector{Float64})
+    # Return if the point s is already in the set.
+    if in(s, scen.Vs)
+        return
+    end
+
     if !scen.auglag.internalModelLoaded
         init_auglag_sdm(admm, scen, s)
         return
@@ -316,9 +324,14 @@ end
 
 function solve_sdm(admm::AdmmAlg, scen::Scenario)
     xs = (1 - admm.alpha)*admm.z + admm.alpha*scen.x[admm.nonant_inds]
+    update_linobjsdm(admm, scen)
 
     for t in 1:admm.tmax
         if t > 1
+            # Terminate if the same solution was found
+            if sum(abs.(xs - scen.x[admm.nonant_inds])) < admm.tol
+                break
+            end
             xs = scen.x[admm.nonant_inds]
         end
 
@@ -326,9 +339,9 @@ function solve_sdm(admm::AdmmAlg, scen::Scenario)
         in_m = internalmodel(scen.m)
 
         # Update the objective coefficients of the linearized AugLag.
-    for j in 1:length(scen.c)
-        scen.scratch[j] = scen.c[j]
-    end
+        for j in 1:length(scen.c)
+            scen.scratch[j] = scen.c[j]
+        end
 
         for (i,j) in enumerate(admm.nonant_inds)
             scen.scratch[j] += ws[i]
@@ -455,7 +468,7 @@ function print_summary(admm::AdmmAlg, k::Integer, err::Float64)
 
     recvbuf = MPI.Allgather(objval, MPI.COMM_WORLD)
     if MPI.Comm_rank(MPI.COMM_WORLD) == 0
-        @printf("Objective value: %10.6e", sum(recvbuf))
+        @printf("Objective value: %10.6e\n", sum(recvbuf))
     end
 end
 

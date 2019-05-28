@@ -36,7 +36,7 @@ function partition(part)
         mylist[i] = Array{Int64,1}(undef, 0)
     end
     for i in 1:part
-        push!(mylist[(i-1)÷(part÷min(part,nprocs()))+1], i)
+        push!(mylist[mod(i-1,nprocs())+1], i)
     end
     global partitionlist = mylist[myid()+1]
 end

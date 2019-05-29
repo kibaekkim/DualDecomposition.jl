@@ -104,7 +104,7 @@ function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
     end
 end
 
-function solveLagrangeDual(λ::Array{Float64,1})
+function solveLagrangeDual(λ::Array{Float64,1}, timelimit::Float64=1.e+20)
     # output
     sindices = Int64[]
     objvals = Float64[]
@@ -134,6 +134,20 @@ function solveLagrangeDual(λ::Array{Float64,1})
                 push!(affobj.coeffs, λ[start_index])
             end
             start_index += 1
+        end
+
+        # Set time limit here (UGLY...)
+        if timelimit < 1.e+20
+            if typeof(m.solver) == CplexSolver
+                if m.internalModelLoaded
+                    CPLEX.set_param!(m.internalModel.inner.env,
+                        "CPX_PARAM_TILIM", timelimit)
+                else
+                    opts = collect(Any,m.solver.options)
+                    push!(opts, (:CPX_PARAM_TILIM, timelimit))
+                    m.solver.options = opts
+                end
+            end
         end
 
         # Solver the Lagrange dual

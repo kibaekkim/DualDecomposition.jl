@@ -7,7 +7,7 @@ Assume: two-stage stochastic programming
 module JuDD
 
 using Compat
-using JuMP
+using JuMP, CPLEX
 using BundleMethod
 const BM = BundleMethod
 

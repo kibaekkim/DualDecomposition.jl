@@ -138,6 +138,7 @@ function solveLagrangeDual(λ::Array{Float64,1}, timelimit::Float64=1.e+20)
 
         # Set time limit here (UGLY...)
         if timelimit < 1.e+20
+            timelimit = max(timelimit,0.0)
             if typeof(m.solver) == CplexSolver
                 if m.internalModelLoaded
                     CPLEX.set_param!(m.internalModel.inner.env,

@@ -17,7 +17,7 @@ version = "0.5.4"
 
 [[BundleMethod]]
 deps = ["Compat", "JuMP", "MPI", "StructJuMP", "StructJuMPSolverInterface"]
-git-tree-sha1 = "a1661cfd191cf18c637bfd3a88d169f48bc14b7c"
+git-tree-sha1 = "9c8a2b8abc2ff48c2fc9d47f78d77e8b07ea2d95"
 repo-rev = "structjump"
 repo-url = "https://github.com/kibaekkim/BundleMethod.jl"
 uuid = "03bf20df-d8a0-5746-8978-d623d54f279b"

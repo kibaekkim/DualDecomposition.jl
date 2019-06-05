@@ -17,7 +17,7 @@ version = "0.5.4"
 
 [[BundleMethod]]
 deps = ["Compat", "JuMP", "MPI", "StructJuMP", "StructJuMPSolverInterface"]
-git-tree-sha1 = "9c8a2b8abc2ff48c2fc9d47f78d77e8b07ea2d95"
+git-tree-sha1 = "e3da81f0165a4b7e78ebc03bab06f9bbe3e4ef5b"
 repo-rev = "structjump"
 repo-url = "https://github.com/kibaekkim/BundleMethod.jl"
 uuid = "03bf20df-d8a0-5746-8978-d623d54f279b"
@@ -220,7 +220,7 @@ version = "0.1.0+"
 
 [[StructJuMPSolverInterface]]
 deps = ["Ipopt", "JuMP", "Libdl", "MPI", "MathProgBase", "Printf", "SparseArrays", "StructJuMP"]
-git-tree-sha1 = "c5d757bdb5f92f3a08c2dfac59bb157afaa63080"
+git-tree-sha1 = "81d5ada2f11f5387a0e008742737d271ab5dbf28"
 repo-rev = "duals"
 repo-url = "https://github.com/Argonne-National-Laboratory/StructJuMPSolverInterface.jl.git"
 uuid = "7a00d66c-3a07-54c1-b1e3-917bd47595ee"

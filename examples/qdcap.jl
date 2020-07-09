@@ -72,4 +72,5 @@ end
 # return the array of nonanticipativity variables
 nonanticipativity_vars() = [:x,:u]
 
-main_dcap(2,3,3,20; use_admm=true)
+# main_dcap(2,3,3,20; use_admm=true)
+main_dcap(2,3,3,20)

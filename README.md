@@ -1,9 +1,9 @@
-# JuDD.jl
+# DualDecomposition.jl
 Scenario Decomposition of Stochastic Programming in Julia
 
 This package can be installed by cloning this repository:
 ```julia
-] add https://github.com/kibaekkim/JuDD.jl
+] add https://github.com/kibaekkim/DualDecomposition.jl
 ```
 
 This package requires to install `BundleMethod.jl`:

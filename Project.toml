@@ -1,0 +1,4 @@
+name = "DualDecomposition"
+uuid = "d0e446f1-e135-48f1-a6ea-e9a6190f2a7a"
+authors = ["Kibaek Kim <kimk@anl.gov>"]
+version = "0.1.0"

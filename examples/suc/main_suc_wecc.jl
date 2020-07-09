@@ -12,7 +12,7 @@ Date:
 
 include("suc_wecc_data.jl")
 
-using JuDD
+using DualDecomposition
 using JuMP, CPLEX, Ipopt
 
 # Number of scenarios: up to 1000 for each season
@@ -27,19 +27,19 @@ uc = weccdata(NS, offset, seasons[1])
 
 # This is the main function to solve the example by using dual decomposition.
 function main_suc_wecc()
-    # Create JuDD instance.
-    JuDD.LagrangeDuals(NS)
+    # Create DualDecomposition instance.
+    DualDecomposition.LagrangeDuals(NS)
 
     # Add Lagrange dual problem for each scenario s.
     for s in 1:NS
-        JuDD.add_Lagrange_dual_model(s, uc.π[s], create_scenario_model(s))
+      DualDecomposition.add_Lagrange_dual_model(s, uc.π[s], create_scenario_model(s))
     end
 
     # Set nonanticipativity variables as an array of symbols.
-    JuDD.set_nonanticipativity_vars(nonanticipativity_vars())
+    DualDecomposition.set_nonanticipativity_vars(nonanticipativity_vars())
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    JuDD.solve(IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
+    DualDecomposition.solve(IpoptSolver(print_level=0), master_alrogithm = :ProximalDualBundle)
 end
 
 # This creates a Lagrange dual problem for each scenario s.

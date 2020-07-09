@@ -4,7 +4,7 @@ Dual Decomposition of Stochastic Programming in Julia
 Assume: two-stage stochastic programming
 =#
 
-module JuDD
+module DualDecomposition
 
 using Compat
 using JuMP
@@ -43,4 +43,4 @@ function solve(alg::AbstractAlg, solver)
     print_warning()
 end
 
-end  # modJuDD
+end  # module DualDecomposition

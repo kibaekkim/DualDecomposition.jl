@@ -1,4 +1,4 @@
-using JuDD
+using DualDecomposition
 using JuMP, Ipopt
 using CPLEX
 
@@ -18,7 +18,7 @@ const Minreq = [200 240 0]    # minimum crop requirement
 
 # This is the main function to solve the example by using dual decomposition.
 function main_farmer(; use_admm = false)
-    # Create JuDD instance.
+    # Create DualDecomposition instance.
 	if use_admm
 		algo = AdmmAlg()
 	else
@@ -35,9 +35,9 @@ function main_farmer(; use_admm = false)
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
 	if use_admm
-    	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0))
+    	DualDecomposition.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0))
 	else
-    	JuDD.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalBundle)
+    	DualDecomposition.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalBundle)
 	end
 end
 

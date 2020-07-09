@@ -34,7 +34,7 @@ if !isless(VERSION,v"0.7.0")
     using Random
 	srand(s) = Random.seed!(s)
 end
-using JuDD
+using DualDecomposition
 using JuMP, Ipopt
 using CPLEX
 
@@ -55,7 +55,7 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1; use_admm = f
     global d = rand(nN, nT, nS) .+ 0.5
     Pr = ones(nS)/nS
 
-    # Create JuDD instance.
+    # Create DualDecomposition instance.
 	if use_admm
 		algo = AdmmAlg(;rho = 50)
 	else
@@ -72,9 +72,9 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1; use_admm = f
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
 	if use_admm
-    	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0))
+    DualDecomposition.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0))
 	else
-    	JuDD.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalBundle)
+    DualDecomposition.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalBundle)
 	end
 end
 

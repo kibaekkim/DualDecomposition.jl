@@ -22,11 +22,21 @@ mutable struct BlockModel
     model::Dict{Int,JuMP.Model} # Dictionary of block models
     coupling_variables::Vector{CouplingVariableRef} # array of variables that couple block models
     variables_by_couple::Dict{Any,Vector{JuMP.VariableRef}} # maps `couple_id` to `JuMP.VariableRef`
+
+    dual_bound::Float64
+    dual_solution::Vector{Float64}
+
+    # TODO: These may be available with heuristics.
+    # primal_bound::Float64
+    # primal_solution::Vector{Float64}
+
     function BlockModel()
         return new(
             Dict(), 
             [],
-            Dict())
+            Dict(),
+            0.0,
+            [])
     end
 end
 
@@ -87,3 +97,17 @@ function set_coupling_variables!(block_model::BlockModel, variables::Vector{Coup
         push!(block_model.variables_by_couple[v.coupling_id], v.ref)
     end
 end
+
+"""
+    dual_objective_value
+
+This returns the dual objective value obtained from a method.
+"""
+dual_objective_value(block_model::BlockModel) = block_model.dual_bound
+
+"""
+    dual_solution
+
+This returns a vector of dual solution obtained from a method.
+"""
+dual_solution(block_model::BlockModel) = block_model.dual_solution

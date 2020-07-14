@@ -94,6 +94,8 @@ function run!(LD::LagrangeDual, optimizer)
             reset_objective_function!(LD, var, λ[index_of_λ(LD, var.ref)])
         end
 
+        # TODO: we may be able to add heuristic steps here.
+
         return objvals, subgrads
     end
 

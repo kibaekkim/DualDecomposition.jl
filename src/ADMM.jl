@@ -60,7 +60,7 @@ mutable struct Scenario
     end
 end
 
-mutable struct AdmmAlg <: AbstractAlg
+mutable struct AdmmAlg <: AbstractMethod
     scen::Dict{Integer, Scenario} # scenarios
     nonant_names::Vector{Symbol}  # symbols of non-anticipativity variables
     nonant_inds::Vector{Int32}    # flattened indices of non-ant variables

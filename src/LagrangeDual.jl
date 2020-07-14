@@ -76,10 +76,10 @@ function run!(LD::LagrangeDual, optimizer)
 
             # Solver the Lagrange dual
             JuMP.optimize!(m)
-            @assert JuMP.termination_status(m) == MOI.OPTIMAL
+            @assert JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
 
             # We may want consider other statuses.
-            if JuMP.termination_status(m) in [MOI.OPTIMAL]
+            if JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
                 objvals[id] = -JuMP.objective_value(m)
             end
         end

@@ -42,6 +42,9 @@ function set_coupling_variables!(LD::LagrangeDual, variables::Vector{CouplingVar
     LD.vref_to_index = Dict(v.ref => i for (i,v) in enumerate(variables))
 end
 
+dual_objective_value(LD::LagrangeDual) = dual_objective_value(LD.block_model)
+dual_solution(LD::LagrangeDual) = dual_solution(LD.block_model)
+
 """
     run!(LD::LagrangeDual, optimizer)
 
@@ -115,6 +118,12 @@ function run!(LD::LagrangeDual, optimizer)
 
     # This runs the bundle method.
     BM.run!(bundle)
+
+    # get dual objective value
+    LD.block_model.dual_bound = -BM.getobjectivevalue(bundle)
+
+    # get dual solution
+    LD.block_model.dual_solution = copy(BM.getsolution(bundle))
 end
 
 """

@@ -1,6 +1,6 @@
 #=
 Source:
-  Ntaimo, L. and S. Sen, "The 'million-variable' march for stochastic combinatorial optimization," Journal of Global Optimization, 2005.
+  Ntaimo, L. and S. Sen, "The 'million-variable' march for stochastic combinatorial optimization," Journal of Optimization, 2005.
 
 Input:
   nJ: number of servers
@@ -33,76 +33,72 @@ Parameters (general):
 Parameters (scenario):
   h[i,s]: 1 if client i is present in scenario s, 0 otherwise
 =#
-
-if !isless(VERSION,v"0.7.0")
-    using Random
-	srand(s) = Random.seed!(s)
-end
 using DualDecomposition
-using JuMP, Ipopt
-using CPLEX
+using JuMP, Ipopt, GLPK
+using Random
 
-function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1; use_admm = false)
-    srand(seed)
+const DD = DualDecomposition
 
-    global sJ = 1:nJ
-    global sI = 1:nI
-    global sS = 1:nS
+function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
+    Random.seed!(seed)
 
-    global c = rand(40:80,nJ)
-    global q = rand(0:25,nI,nJ,nS)
-    global q0 = ones(nJ)*1000
-    global d = q
-    global u = 1.5*sum(d)/nJ
-    global v = nJ
-    global h = rand(0:1,nI,nS)
+    sJ = 1:nJ
+    sI = 1:nI
+    sS = 1:nS
+
+    c = rand(40:80,nJ)
+    q = rand(0:25,nI,nJ,nS)
+    q0 = ones(nJ)*1000
+    d = q
+    u = 1.5*sum(d)/nJ
+    v = nJ
+    h = rand(0:1,nI,nS)
     Pr = ones(nS)/nS
 
-    # Create DualDecomposition instance.
-	if use_admm
-		algo = AdmmAlg(;rho=5000, kmax=5000, tol=1.e-4)
-	else
-	    algo = LagrangeDualAlg(nS)
-	end
-
-    # Add Lagrange dual problem for each scenario s.
-    for s in 1:nS
-        add_scenario_model(algo, s, Pr[s], create_scenario_model(s))
+    # This creates a Lagrange dual problem for each scenario s.
+    function create_scenario_model(s::Int64)
+        model = Model(GLPK.Optimizer)
+    
+        @variable(model, x[j=sJ], Bin)
+        @variable(model, y[i=sI,j=sJ], Bin)
+        @variable(model, y0[j=sJ] >= 0)
+    
+        @objective(model, Min,
+              sum(c[j]*x[j] for j in sJ)
+            - sum(q[i,j,s]*y[i,j] for i in sI for j in sJ)
+            + sum(q0[j]*y0[j] for j in sJ))
+    
+        @constraint(model, sum(x[j] for j in sJ) <= v)
+        @constraint(model, [j=sJ], sum(d[i,j,s]*y[i,j] for i in sI) - y0[j] <= u*x[j])
+        @constraint(model, [i=sI], sum(y[i,j] for j in sJ) == h[i,s])
+    
+        return model
     end
 
+    # Create DualDecomposition instance.
+    algo = DD.LagrangeDual()
+  
+    # Add Lagrange dual problem for each scenario s.
+    models = Dict{Int,JuMP.Model}(s => create_scenario_model(s) for s in sS)
+    for s in sS
+        DD.add_block_model!(algo, s, models[s])
+    end
+  
+    coupling_variables = Vector{DD.CouplingVariableRef}()
+    for s in sS
+        model = models[s]
+        xref = model[:x]
+        for i in sJ
+            push!(coupling_variables, DD.CouplingVariableRef(s, i, xref[i]))
+        end
+    end
+  
     # Set nonanticipativity variables as an array of symbols.
-    set_nonanticipativity_vars(algo, nonanticipativity_vars())
-
+    DD.set_coupling_variables!(algo, coupling_variables)
+    
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-	if use_admm
-    DualDecomposition.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0))
-	else
-    DualDecomposition.solve(algo, IpoptSolver(print_level=0), master_alrogithm = :ProximalBundle)
-	end
+    DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
 end
-
-# This creates a Lagrange dual problem for each scenario s.
-function create_scenario_model(s::Int64)
-    model = Model(solver=CplexSolver(CPX_PARAM_SCRIND=0))
-
-    @variable(model, x[j=sJ], Bin)
-    @variable(model, y[i=sI,j=sJ], Bin)
-    @variable(model, y0[j=sJ] >= 0)
-
-    @objective(model, Min,
-          sum(c[j]*x[j] for j in sJ)
-        - sum(q[i,j,s]*y[i,j] for i in sI for j in sJ)
-        + sum(q0[j]*y0[j] for j in sJ))
-
-    @constraint(model, sum(x[j] for j in sJ) <= v)
-    @constraint(model, [j=sJ], sum(d[i,j,s]*y[i,j] for i in sI) - y0[j] <= u*x[j])
-    @constraint(model, [i=sI], sum(y[i,j] for j in sJ) == h[i,s])
-
-    return model
-end
-
-# return the array of nonanticipativity variables
-nonanticipativity_vars() = [:x]
 
 main_sslp(10,50,50)
 # main_sslp(10,50,100)

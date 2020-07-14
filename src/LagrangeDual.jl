@@ -143,13 +143,8 @@ This adjusts the objective function of each Lagrangian subproblem.
 function adjust_objective_function!(LD::LagrangeDual, var::CouplingVariableRef, λ::Float64)
     affobj = objective_function(LD, var.block_id)
     @assert typeof(affobj) == AffExpr
-
-    if haskey(affobj.terms, var.ref)
-        affobj.terms[var.ref] += λ
-    else
-        affobj.terms[var.ref] = λ
-    end
-    JuMP.set_objective_function(block_model(LD, var.block_id), affobj)
+    coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] + λ : λ
+    JuMP.set_objective_coefficient(block_model(LD, var.block_id), var.ref, coef)
 end
 
 
@@ -159,17 +154,13 @@ This resets the objective function of each Lagrangian subproblem.
 function reset_objective_function!(LD::LagrangeDual, var::CouplingVariableRef, λ::Float64)
     affobj = objective_function(LD, var.block_id)
     @assert typeof(affobj) == AffExpr
-    affobj.terms[var.ref] -= λ
-    JuMP.set_objective_function(block_model(LD, var.block_id), affobj)
+    coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] - λ : -λ
+    JuMP.set_objective_coefficient(block_model(LD, var.block_id), var.ref, coef)
 end
 
 """
 Wrappers of other functions
 """
-objective_function(LD::LagrangeDual, block_id::Integer) = JuMP.objective_function(block_model(LD, block_id), AffExpr)
-
-function set_objective_function(LD::LagrangeDual, block_id::Integer)
-    JuMP.set_objective_function(block_model(LD, block_id), AffExpr)
-end
+objective_function(LD::LagrangeDual, block_id::Integer) = JuMP.objective_function(block_model(LD, block_id), QuadExpr).aff
 
 index_of_λ(LD::LagrangeDual, vref::JuMP.VariableRef)::Int = LD.vref_to_index[vref]

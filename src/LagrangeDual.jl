@@ -1,135 +1,166 @@
-mutable struct LagrangeDualAlg <: AbstractAlg
-    num_scenarios::Int64			# total number of scenarios
-    probability::Dict{Int64,Float64}	# probabilities
-    model::Dict{Int64,JuMP.Model}		# Dictionary of dual subproblems
-    nonanticipativity_vars::Array{Symbol,1}
-    num_nonant_vars::Int64
-    nonant_indices::Array{Int64,1}
-    master_algorithms::Dict{Symbol,Type}
+"""
+    LagrangeDual
 
-    # parameters
-    maxiter::Integer    # maximum number of iterations
-    tol::Float64         # convergence tolerance
+Lagrangian dual method for dual decomposition. This `mutable struct` constains:
+    - `block_model::BlockModel` object
+    - `vref_to_index` mapping `JuMP.VariableRef` to index used in this method
+    - `masiter::Int` sets the maximum number of iterations
+    - `tol::Float64` sets the relative tolerance for termination
+"""
+mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractMethod
+    block_model::BlockModel
+    vref_to_index::Dict{JuMP.VariableRef,Int} # maps `JuMP.VariableRef` to index in decomposition method
+    bundle_method
+    maxiter::Int # maximum number of iterations
+    tol::Float64 # convergence tolerance
 
-    function LagrangeDualAlg(n::Int64; maxiter=1000, tol=1.e-4)
-        algo = Dict(
-            :ProximalBundle => BM.ProximalMethod,
-            :ProximalDualBundle => BM.ProximalDualMethod
-        )
-        global LD = new(n, Dict(), Dict(), [], 0, [], algo, maxiter, tol)
+    function LagrangeDual(T = BM.ProximalMethod, 
+            maxiter::Int = 1000, tol::Float64 = 1e-6)
+        LD = new{T}()
+        LD.block_model = BlockModel()
+        LD.vref_to_index = Dict()
+        LD.bundle_method = T
+        LD.maxiter = maxiter
+        LD.tol = tol
         return LD
     end
 end
 
-function add_scenario_model(LD::LagrangeDualAlg, s::Integer, p::Float64, model::JuMP.Model)
-    LD.probability[s] = p
-    LD.model[s] = model
+"""
+Wrappers of the functions defined for `BlockModel`
+"""
+
+add_block_model!(LD::LagrangeDual, block_id::Integer, model::JuMP.Model) = add_block_model!(LD.block_model, block_id, model)
+num_blocks(LD::LagrangeDual) = num_blocks(LD.block_model)
+block_model(LD::LagrangeDual, block_id::Integer) = block_model(LD.block_model, block_id)
+block_model(LD::LagrangeDual) = block_model(LD.block_model)
+num_coupling_variables(LD::LagrangeDual) = num_coupling_variables(LD.block_model)
+coupling_variables(LD::LagrangeDual) = coupling_variables(LD.block_model)
+
+function set_coupling_variables!(LD::LagrangeDual, variables::Vector{CouplingVariableRef})
+    set_coupling_variables!(LD.block_model, variables)
+    LD.vref_to_index = Dict(v.ref => i for (i,v) in enumerate(variables))
 end
 
-function get_scenario_model(LD::LagrangeDualAlg, s::Integer)
-    return LD.model[s]
-end
+"""
+    run!(LD::LagrangeDual, optimizer)
 
-function set_nonanticipativity_vars(LD::LagrangeDualAlg, names::Vector{Symbol})
-    LD.nonanticipativity_vars = names
-end
-
-function solve(LD::LagrangeDualAlg, solver; master_alrogithm = :ProximalBundle)
-    # check the validity of LagrangeDualAlg
-    if LD.num_scenarios <= 0 || length(LD.model) <= 0 || length(LD.nonanticipativity_vars) == 0
+This runs the Lagrangian dual method for solving the block model. `optimizer`
+specifies the optimization solver used for `BundleMethod` package.
+"""
+function run!(LD::LagrangeDual, optimizer)
+    # check the validity of LagrangeDual
+    if num_blocks(LD) <= 0 || num_coupling_variables(LD) == 0
         println("Invalid LagrangeDual structure.")
         return
     end
 
-    # Get some model to retrieve model information
-    some_model = collect(values(LD.model))[1]
+    function solveLagrangeDual(λ::Array{Float64,1})
+        @assert length(λ) == num_coupling_variables(LD)
 
-    for v in LD.nonanticipativity_vars
-        vi = getindex(some_model, v)
+        # output
+        objvals = Vector{Float64}(undef, num_blocks(LD))
+        subgrads = Dict{Int,SparseVector{Float64}}()
 
-        # Get the dimension of nonanticipativity variables
-        LD.num_nonant_vars += length(vi)
-
-        # Get the indices for nonanticipativity variables
-        for i in vi.innerArray
-            push!(LD.nonant_indices, i.col)
+        # Adjust block objective function
+        for var in coupling_variables(LD)
+            adjust_objective_function!(LD, var, λ[index_of_λ(LD, var.ref)])
         end
+
+        for (id,m) in block_model(LD)
+            # Initialize subgradients
+            subgrads[id] = sparsevec(Dict{Int,Float64}(), length(λ))
+
+            # Solver the Lagrange dual
+            JuMP.optimize!(m)
+            @assert JuMP.termination_status(m) == MOI.OPTIMAL
+
+            # We may want consider other statuses.
+            if JuMP.termination_status(m) in [MOI.OPTIMAL]
+                objvals[id] = -JuMP.objective_value(m)
+            end
+        end
+
+        # Get subgradients
+        for var in coupling_variables(LD)
+            subgrads[var.block_id][index_of_λ(LD, var.ref)] = -JuMP.value(var.ref)
+        end
+
+        # Reset objective coefficients
+        for var in coupling_variables(LD)
+            reset_objective_function!(LD, var, λ[index_of_λ(LD, var.ref)])
+        end
+
+        return objvals, subgrads
     end
 
-    # Number of variables in the bundle method
-    nvars = LD.num_nonant_vars * LD.num_scenarios
-
     # Create bundle method instance
-    bundle = BM.Model{LD.master_algorithms[master_alrogithm]}(nvars, LD.num_scenarios, solveLagrangeDual, true)
+    bundle = LD.bundle_method(num_coupling_variables(LD), num_blocks(LD), solveLagrangeDual)
+    BM.get_model(bundle).user_data = LD
 
-    # set the underlying solver
-    JuMP.setsolver(bundle.m, solver)
+    # Set optimizer to the JuMP model
+    model = BM.get_jump_model(bundle)
+    JuMP.set_optimizer(model, optimizer)
 
     # parameters for BundleMethod
     # bundle.M_g = max(500, dv.nvars + nmodels + 1)
     bundle.maxiter = LD.maxiter
-    bundle.ext.ϵ_s = LD.tol
+    bundle.ϵ_s = LD.tol
 
-    # Scale the objective coefficients by probability
-    for (s,m) in LD.model
-        affobj = m.obj.aff
-        affobj.coeffs *= LD.probability[s]
-    end
+    # This builds the bunlde model.
+    BM.build_bundle_model!(bundle)
 
-    # solve!
-    BM.run(bundle)
+    # Add bounding constraints to the Lagrangian master
+    add_constraints!(LD, bundle)
+
+    # This runs the bundle method.
+    BM.run!(bundle)
 end
 
-function solveLagrangeDual(λ::Array{Float64,1})
-    # output
-    objvals = zeros(LD.num_scenarios)
-    subgrads = zeros(LD.num_scenarios, length(λ))
-
-    for (s,m) in LD.model
-        # initialize results
-        objval = 0.0
-        subgrad = zeros(length(λ))
-
-        # Get the affine part of objective function
-        affobj = m.obj.aff
-
-        # Change objective coefficients
-        start_index = (s - 1) * LD.num_nonant_vars + 1
-        for j in LD.nonant_indices
-            var = Variable(m, j)
-            if var in affobj.vars
-                objind = findfirst(x->x==var, affobj.vars)
-                affobj.coeffs[objind] += λ[start_index]
-            else
-                push!(affobj.vars, var)
-                push!(affobj.coeffs, λ[start_index])
-            end
-            start_index += 1
-        end
-
-        # Solver the Lagrange dual
-        status = JuMP.solve(m)
-
-        if status == :Optimal
-            objval = getobjectivevalue(m)
-            for j in 1:LD.num_nonant_vars
-                subgrad[(s - 1) * LD.num_nonant_vars + j] = getvalue(Variable(m, LD.nonant_indices[j]))
-            end
-        end
-
-        # Add objective value and subgradient
-        objvals[s] = objval
-        subgrads[s,:] = subgrad
-
-        # Reset objective coefficients
-        start_index = (s - 1) * LD.num_nonant_vars + 1
-        for j in LD.nonant_indices
-            var = Variable(m, j)
-            objind = findfirst(x->x==var, affobj.vars)
-            affobj.coeffs[objind] -= λ[start_index]
-            start_index += 1
-        end
+"""
+This adds the bounding constraints to the Lagrangian master problem.
+"""
+function add_constraints!(LD::LagrangeDual, method::BM.AbstractMethod)
+    model = BM.get_jump_model(method)
+    λ = model[:x]
+    for (id, vars) in LD.block_model.variables_by_couple
+        @constraint(model, sum(λ[index_of_λ(LD, v)] for v in vars) == 0)
     end
-
-    return -objvals, -subgrads
 end
+
+"""
+This adjusts the objective function of each Lagrangian subproblem.
+"""
+function adjust_objective_function!(LD::LagrangeDual, var::CouplingVariableRef, λ::Float64)
+    affobj = objective_function(LD, var.block_id)
+    @assert typeof(affobj) == AffExpr
+
+    if haskey(affobj.terms, var.ref)
+        affobj.terms[var.ref] += λ
+    else
+        affobj.terms[var.ref] = λ
+    end
+    JuMP.set_objective_function(block_model(LD, var.block_id), affobj)
+end
+
+
+"""
+This resets the objective function of each Lagrangian subproblem.
+"""
+function reset_objective_function!(LD::LagrangeDual, var::CouplingVariableRef, λ::Float64)
+    affobj = objective_function(LD, var.block_id)
+    @assert typeof(affobj) == AffExpr
+    affobj.terms[var.ref] -= λ
+    JuMP.set_objective_function(block_model(LD, var.block_id), affobj)
+end
+
+"""
+Wrappers of other functions
+"""
+objective_function(LD::LagrangeDual, block_id::Integer) = JuMP.objective_function(block_model(LD, block_id), AffExpr)
+
+function set_objective_function(LD::LagrangeDual, block_id::Integer)
+    JuMP.set_objective_function(block_model(LD, block_id), AffExpr)
+end
+
+index_of_λ(LD::LagrangeDual, vref::JuMP.VariableRef)::Int = LD.vref_to_index[vref]

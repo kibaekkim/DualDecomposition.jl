@@ -12,8 +12,6 @@ version = "0.5.0"
 [[BundleMethod]]
 deps = ["JuMP", "LinearAlgebra", "Printf", "SparseArrays"]
 git-tree-sha1 = "ec8a7101b4d1954a11cd64c2d58c3183410fafe7"
-repo-rev = "master"
-repo-url = "https://github.com/kibaekkim/BundleMethod.jl.git"
 uuid = "e8a6717a-069f-43d5-9ac2-a49b1ec5be7b"
 version = "0.1.1"
 

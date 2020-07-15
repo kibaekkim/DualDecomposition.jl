@@ -67,7 +67,6 @@ const DD = DualDecomposition
             @test isapprox(DD.dual_objective_value(algo), -108390, rtol=1e-3)
         end
 
-        #= This will be available with BundleMethod version > 0.1.1.
         @testset "Trust Region Method" begin
             # Create DualDecomposition instance.
             algo = DD.LagrangeDual(BM.TrustRegionMethod)
@@ -81,9 +80,12 @@ const DD = DualDecomposition
             DD.set_coupling_variables!(algo, coupling_variables)
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
-            DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+            DD.run!(algo, GLPK.Optimizer)
+
+            @show DD.dual_objective_value(algo)
+            @show DD.dual_solution(algo)
+            @test isapprox(DD.dual_objective_value(algo), -108390, rtol=1e-3)
         end
-        =#
     end
 
     @testset "QP" begin
@@ -163,7 +165,6 @@ const DD = DualDecomposition
             @test isapprox(DD.dual_objective_value(algo), objval, rtol=1e-3)
         end
 
-        #= This will be available with BundleMethod version > 0.1.1.
         @testset "Trust Region Method" begin
             # Create DualDecomposition instance.
             algo = DD.LagrangeDual(BM.TrustRegionMethod)
@@ -177,9 +178,12 @@ const DD = DualDecomposition
             DD.set_coupling_variables!(algo, coupling_variables)
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
-            DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+            DD.run!(algo, GLPK.Optimizer)
+
+            @show DD.dual_objective_value(algo)
+            @show DD.dual_solution(algo)
+            @test isapprox(DD.dual_objective_value(algo), objval, rtol=1e-3)
         end
-        =#
     end
 end
 

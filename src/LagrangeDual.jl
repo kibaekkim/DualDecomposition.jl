@@ -24,11 +24,13 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractMethod
         LD.tol = tol
 
         parallel.init()
-        finalizer(LagrangeDual->parallel.finalize(), LagrangeDual)
+        finalizer(finalize!, LD)
         
         return LD
     end
 end
+
+finalize!(LD::LagrangeDual) = parallel.finalize()
 
 """
 Wrappers of the functions defined for `BlockModel`
@@ -42,8 +44,10 @@ num_coupling_variables(LD::LagrangeDual) = num_coupling_variables(LD.block_model
 coupling_variables(LD::LagrangeDual) = coupling_variables(LD.block_model)
 
 function set_coupling_variables!(LD::LagrangeDual, variables::Vector{CouplingVariableRef})
-    set_coupling_variables!(LD.block_model, variables)
-    LD.vref_to_index = Dict(v.ref => i for (i,v) in enumerate(variables))
+    # collect all coupling variables
+    all_variables = parallel.collect(variables)
+    set_coupling_variables!(LD.block_model, all_variables)
+    LD.vref_to_index = Dict(v.ref => i for (i,v) in enumerate(all_variables))
 end
 
 dual_objective_value(LD::LagrangeDual) = dual_objective_value(LD.block_model)
@@ -64,6 +68,11 @@ function run!(LD::LagrangeDual, optimizer)
 
     function solveLagrangeDual(λ::Array{Float64,1})
         @assert length(λ) == num_coupling_variables(LD)
+
+        # broadcast λ
+        if parallel.myid() == 0
+            parallel.bcast(λ)
+        end
 
         # output
         objvals = Vector{Float64}(undef, num_blocks(LD))
@@ -103,27 +112,41 @@ function run!(LD::LagrangeDual, optimizer)
         return objvals, subgrads
     end
 
-    # Create bundle method instance
-    bundle = LD.bundle_method(num_coupling_variables(LD), num_blocks(LD), solveLagrangeDual)
-    BM.get_model(bundle).user_data = LD
+    if parallel.myid() == 0
+        # We assume that the block models are distributed.
+        num_all_blocks = parallel.sum(num_blocks(LD))
 
-    # Set optimizer to the JuMP model
-    model = BM.get_jump_model(bundle)
-    JuMP.set_optimizer(model, optimizer)
+        # Create bundle method instance
+        bundle = LD.bundle_method(num_coupling_variables(LD), num_all_blocks, solveLagrangeDual)
+        BM.get_model(bundle).user_data = LD
+    
+        # Set optimizer to the JuMP model
+        model = BM.get_jump_model(bundle)
+        JuMP.set_optimizer(model, optimizer)
+    
+        # parameters for BundleMethod
+        # bundle.M_g = max(500, dv.nvars + nmodels + 1)
+        bundle.maxiter = LD.maxiter
+        bundle.ϵ_s = LD.tol
+    
+        # This builds the bunlde model.
+        BM.build_bundle_model!(bundle)
+    
+        # Add bounding constraints to the Lagrangian master
+        add_constraints!(LD, bundle)
 
-    # parameters for BundleMethod
-    # bundle.M_g = max(500, dv.nvars + nmodels + 1)
-    bundle.maxiter = LD.maxiter
-    bundle.ϵ_s = LD.tol
+        # This runs the bundle method.
+        BM.run!(bundle)
 
-    # This builds the bunlde model.
-    BM.build_bundle_model!(bundle)
-
-    # Add bounding constraints to the Lagrangian master
-    add_constraints!(LD, bundle)
-
-    # This runs the bundle method.
-    BM.run!(bundle)
+        # broadcast we are done.
+        parallel.bcast(Float64[])
+    else
+        λ = parallel.bcast(nothing)
+        while length(λ) > 0
+            solveLagrangeDual(λ)
+            λ = parallel.bcast(nothing)
+        end
+    end
 
     # get dual objective value
     LD.block_model.dual_bound = -BM.getobjectivevalue(bundle)

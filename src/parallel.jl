@@ -1,13 +1,16 @@
 module parallel
-using Compat
 using MPI
 
 function init()
-    MPI.Init()
+    if !MPI.Initialized()
+        MPI.Init()
+    end
 end
 
 function finalize()
-    MPI.Finalize()
+    if MPI.Initialized()
+        MPI.Finalize()
+    end
 end
 
 function myid()
@@ -41,6 +44,22 @@ function partition(part)
     global partitionlist = mylist[myid()+1]
 end
 
+function sum(x::Number)
+    if nprocs() == 1
+        return x
+    else
+        return MPI.Reduce(x, +, 0, MPI.COMM_WORLD)
+    end
+end
+
+function collect(x::Vector{Any})
+    if nprocs() == 1
+        return x
+    else
+        return MPI.Allgatherv(x, length(x), MPI.COMM_WORLD)
+    end
+end
+
 function reduce(x::Array{T,1}) where {T<:Number}
     counts = Cint[size(mylist[i],1) for i in 1:size(mylist,1)]
     res=MPI.Allgatherv(x, counts, MPI.COMM_WORLD)
@@ -64,4 +83,11 @@ function reduce(x::Array{Float64,2})
     end
     ret
 end
+
+function bcast(buf)
+    if nprocs() > 1
+        MPI.bcast(buf, 0, MPI.COMM_WORLD)
+    end
+end
+
 end

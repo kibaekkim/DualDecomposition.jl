@@ -1,6 +1,7 @@
-using JuDD
-using JuMP, Ipopt
-using CPLEX
+using DualDecomposition
+using JuMP, Ipopt, GLPK
+
+const DD = DualDecomposition
 
 const NS = 3  # number of scenarios
 const probability = ones(3) / 3
@@ -16,39 +17,17 @@ const Sell = [170 150 36 10]  # selling price
 const Yield = [3.0 3.6 24.0; 2.5 3.0 20.0; 2.0 2.4 16.0]
 const Minreq = [200 240 0]    # minimum crop requirement
 
-# This is the main function to solve the example by using dual decomposition.
-function main_farmer(; use_admm = false)
-    # Create JuDD instance.
-	if use_admm
-		algo = AdmmAlg()
-	else
-	    algo = LagrangeDualAlg(NS)
-	end
-
-    # Add Lagrange dual problem for each scenario s.
-    add_scenario_models(algo, NS, probability, create_scenario_model)
-
-    # Set nonanticipativity variables as an array of symbols.
-    set_nonanticipativity_vars(algo, nonanticipativity_vars())
-
-    # Solve the problem with the solver; this solver is for the underlying bundle method.
-	if use_admm
-    	JuDD.solve(algo, CplexSolver(CPX_PARAM_SCRIND=0, CPX_PARAM_THREADS=1))
-	else
-    	JuDD.solve(algo, "PipsNlp", master_alrogithm = :ProximalDualBundle)
-	end
-end
-
 # This creates a Lagrange dual problem for each scenario s.
 function create_scenario_model(s::Int64)
-    m = Model(solver=CplexSolver(CPX_PARAM_SCRIND=0))
+    m = Model(GLPK.Optimizer)
     @variable(m, 0 <= x[i=CROPS] <= 500, Int)
     @variable(m, y[j=PURCH] >= 0)
     @variable(m, w[k=SELL] >= 0)
 
     @objective(m, Min,
-          sum(Cost[i] * x[i] for i=CROPS)
-        + sum(Purchase[j] * y[j] for j=PURCH) - sum(Sell[k] * w[k] for k=SELL))
+        probability[s] * sum(Cost[i] * x[i] for i=CROPS)
+        + probability[s] * sum(Purchase[j] * y[j] for j=PURCH) 
+        - probability[s] * sum(Sell[k] * w[k] for k=SELL))
 
     @constraint(m, sum(x[i] for i=CROPS) <= Budget)
     @constraint(m, [j=PURCH], Yield[s,j] * x[j] + y[j] - w[j] >= Minreq[j])
@@ -57,7 +36,26 @@ function create_scenario_model(s::Int64)
     return m
 end
 
-# return the array of nonanticipativity variables
-nonanticipativity_vars() = [:x]
+# Create DualDecomposition instance.
+algo = DD.LagrangeDual()
 
-main_farmer()
+# Add Lagrange dual problem for each scenario s.
+models = Dict{Int,JuMP.Model}(s => create_scenario_model(s) for s in 1:NS)
+for s in 1:NS
+    DD.add_block_model!(algo, s, models[s])
+end
+
+coupling_variables = Vector{DD.CouplingVariableRef}()
+for s in 1:NS
+    model = models[s]
+    xref = model[:x]
+    for i in CROPS
+        push!(coupling_variables, DD.CouplingVariableRef(s, i, xref[i]))
+    end
+end
+
+# Set nonanticipativity variables as an array of symbols.
+DD.set_coupling_variables!(algo, coupling_variables)
+
+# Solve the problem with the solver; this solver is for the underlying bundle method.
+DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))

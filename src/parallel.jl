@@ -52,11 +52,12 @@ function sum(x::Number)
     end
 end
 
-function collect(x::Vector{Any})
+function collect(x::Vector{T}) where {T}
     if nprocs() == 1
         return x
     else
-        return MPI.Allgatherv(x, length(x), MPI.COMM_WORLD)
+        counts = MPI.Allgatherv(length(x), 1, MPI.COMM_WORLD)
+        return MPI.Allgatherv(x, counts, MPI.COMM_WORLD)
     end
 end
 

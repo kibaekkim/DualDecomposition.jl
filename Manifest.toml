@@ -11,9 +11,9 @@ version = "0.5.0"
 
 [[BundleMethod]]
 deps = ["JuMP", "LinearAlgebra", "Printf", "SparseArrays"]
-git-tree-sha1 = "ec8a7101b4d1954a11cd64c2d58c3183410fafe7"
+git-tree-sha1 = "fb091b69facb76543ff05caf7a2d80062623e601"
 uuid = "e8a6717a-069f-43d5-9ac2-a49b1ec5be7b"
-version = "0.1.1"
+version = "0.1.2"
 
 [[Bzip2_jll]]
 deps = ["Libdl", "Pkg"]

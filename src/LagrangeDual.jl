@@ -110,7 +110,7 @@ function run!(LD::LagrangeDual, optimizer)
     # parameters for BundleMethod
     # bundle.M_g = max(500, dv.nvars + nmodels + 1)
     bundle.maxiter = LD.maxiter
-    set_bundle_tolerance!(LD, bundle)
+    BM.set_bundle_tolerance!(bundle, LD.tol)
 
     # This builds the bunlde model.
     BM.build_bundle_model!(bundle)
@@ -122,27 +122,10 @@ function run!(LD::LagrangeDual, optimizer)
     BM.run!(bundle)
 
     # get dual objective value
-    LD.block_model.dual_bound = -get_objective_value(bundle)
+    LD.block_model.dual_bound = -BM.get_objective_value(bundle)
 
     # get dual solution
-    LD.block_model.dual_solution = copy(get_solution(bundle))
-end
-
-"""
-    Wrappers for BundleMethod functions
-"""
-
-get_objective_value(method::BM.ProximalMethod) = BM.getobjectivevalue(method)
-get_objective_value(method::BM.TrustRegionMethod) = BM.get_objective_value(method)
-get_solution(method::BM.ProximalMethod) = BM.getsolution(method)
-get_solution(method::BM.TrustRegionMethod) = BM.get_solution(method)
-
-function set_bundle_tolerance!(LD::LagrangeDual, method::BM.ProximalMethod)
-    method.ϵ_s = LD.tol
-end
-
-function set_bundle_tolerance!(LD::LagrangeDual, method::BM.TrustRegionMethod)
-    method.ϵ = LD.tol
+    LD.block_model.dual_solution = copy(BM.get_solution(bundle))
 end
 
 """

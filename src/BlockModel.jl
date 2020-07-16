@@ -21,7 +21,7 @@ models.
 mutable struct BlockModel
     model::Dict{Int,JuMP.Model} # Dictionary of block models
     coupling_variables::Vector{CouplingVariableRef} # array of variables that couple block models
-    variables_by_couple::Dict{Any,Vector{JuMP.VariableRef}} # maps `couple_id` to `JuMP.VariableRef`
+    variables_by_couple::Dict{Any,Vector{CouplingVariableRef}} # maps `couple_id` to `CouplingVariableRef`
 
     dual_bound::Float64
     dual_solution::Vector{Float64}
@@ -94,14 +94,21 @@ coupling_variables(block_model::BlockModel) = block_model.coupling_variables
 """
     set_coupling_variables!
 
-This sets coupling variables `variables` to `block_model::BlockModel`. Internally,
-`BlockModel.coupling_variables` and `BlockModel.variables_by_couple` will be set.
+This sets coupling variables `variables` to `block_model::BlockModel`.
 """
 function set_coupling_variables!(block_model::BlockModel, variables::Vector{CouplingVariableRef})
     block_model.coupling_variables = variables
+end
+
+"""
+    set_variables_by_couple!
+
+This sets `BlockModel.variables_by_couple`.
+"""
+function set_variables_by_couple!(block_model::BlockModel, variables::Vector{CouplingVariableRef})
     block_model.variables_by_couple = Dict(v.coupling_id => [] for v in variables)
     for v in variables
-        push!(block_model.variables_by_couple[v.coupling_id], v.ref)
+        push!(block_model.variables_by_couple[v.coupling_id], v)
     end
 end
 

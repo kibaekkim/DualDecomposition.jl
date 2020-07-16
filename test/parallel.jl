@@ -7,7 +7,7 @@ const parallel = DD.parallel
 
 parallel.init()
 
-@testset "combine_dict" begin
+@testset "combine_dict with $(parallel.nprocs()) procs" begin
     x = Dict{Int,Float64}()
     xlen = 3
     for i = 1:xlen
@@ -15,7 +15,7 @@ parallel.init()
     end
 
     x_combined = parallel.combine_dict(x)
-    if parallel.myid() == 0
+    if parallel.is_root()
         for j = 1:parallel.nprocs(), i = 1:xlen
             @test x_combined[xlen*(j-1)+i] == xlen*(j-1)+i*0.2
         end
@@ -27,7 +27,7 @@ parallel.init()
         y[ylen*parallel.myid()+i] = [ylen*parallel.myid()+i*0.2+j for j=1:3]
     end
     y_combined = parallel.combine_dict(y)
-    if parallel.myid() == 0
+    if parallel.is_root()
         for id = 1:parallel.nprocs(), i = 1:ylen
             @test y_combined[ylen*(id-1)+i] == sparsevec([ylen*(id-1)+i*0.2+j for j=1:3])
             @test typeof(y_combined[ylen*(id-1)+i]) == SparseVector{Float64,Int64}

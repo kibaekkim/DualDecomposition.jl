@@ -22,6 +22,8 @@ function myid()
     end
 end
 
+is_root() = (myid() == 0)
+
 function nprocs()
     if MPI.Initialized()
         return MPI.Comm_size(MPI.COMM_WORLD)
@@ -49,7 +51,7 @@ function sum(x::Number)
     if nprocs() == 1
         return x
     else
-        return MPI.Reduce(x, +, 0, MPI.COMM_WORLD)
+        return MPI.Allreduce(x, +, MPI.COMM_WORLD)
     end
 end
 
@@ -83,7 +85,7 @@ function collect(x::Vector{T}) where {T}
         x_serialized = MPI.serialize(x)
         counts::Vector{Cint} = MPI.Allgatherv([length(x_serialized)], ones(Cint, nprocs()), MPI.COMM_WORLD)
         collect_serialized = MPI.Gatherv(x_serialized, counts, 0, MPI.COMM_WORLD)
-        if myid() == 0
+        if is_root()
             x = Vector{T}()
             deserialize!(collect_serialized, counts, x)
         end
@@ -122,7 +124,7 @@ function combine_dict(x::Dict{Int,SparseVector{Float64}})
         counts::Vector{Cint} = MPI.Allgatherv([length(ks)], ones(Cint, nprocs()), MPI.COMM_WORLD)
         ks_collected = MPI.Gatherv(ks, counts, 0, MPI.COMM_WORLD)
         vs_collected = collect(vs)
-        if myid() == 0
+        if is_root()
             @assert length(vs_collected) == Base.sum(counts)
             for i in 1:length(ks_collected)
                 x[ks_collected[i]] = vs_collected[i]

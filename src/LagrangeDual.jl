@@ -40,12 +40,13 @@ add_block_model!(LD::LagrangeDual, block_id::Integer, model::JuMP.Model) = add_b
 num_blocks(LD::LagrangeDual) = num_blocks(LD.block_model)
 block_model(LD::LagrangeDual, block_id::Integer) = block_model(LD.block_model, block_id)
 block_model(LD::LagrangeDual) = block_model(LD.block_model)
+has_block_model(LD::LagrangeDual, block_id::Integer) = has_block_model(LD.block_model, block_id)
 num_coupling_variables(LD::LagrangeDual) = num_coupling_variables(LD.block_model)
 coupling_variables(LD::LagrangeDual) = coupling_variables(LD.block_model)
 
 function set_coupling_variables!(LD::LagrangeDual, variables::Vector{CouplingVariableRef})
     # collect all coupling variables
-    all_variables = parallel.collect(variables)
+    all_variables = parallel.allcollect(variables)
     set_coupling_variables!(LD.block_model, all_variables)
     LD.vref_to_index = Dict(v.ref => i for (i,v) in enumerate(all_variables))
 end
@@ -75,7 +76,8 @@ function run!(LD::LagrangeDual, optimizer)
         end
 
         # output
-        objvals = Vector{Float64}(undef, num_blocks(LD))
+        # objvals = Vector{Float64}(undef, num_blocks(LD))
+        objvals = Dict{Int,Float64}()
         subgrads = Dict{Int,SparseVector{Float64}}()
 
         # Adjust block objective function
@@ -84,6 +86,7 @@ function run!(LD::LagrangeDual, optimizer)
         end
 
         for (id,m) in block_model(LD)
+            @show parallel.myid(), id
             # Initialize subgradients
             subgrads[id] = sparsevec(Dict{Int,Float64}(), length(λ))
 
@@ -99,7 +102,10 @@ function run!(LD::LagrangeDual, optimizer)
 
         # Get subgradients
         for var in coupling_variables(LD)
-            subgrads[var.block_id][index_of_λ(LD, var.ref)] = -JuMP.value(var.ref)
+            if has_block_model(LD, var.block_id)
+                @show parallel.myid(), var.block_id
+                subgrads[var.block_id][index_of_λ(LD, var.ref)] = -JuMP.value(var.ref)
+            end
         end
 
         # Reset objective coefficients
@@ -109,13 +115,23 @@ function run!(LD::LagrangeDual, optimizer)
 
         # TODO: we may be able to add heuristic steps here.
 
-        return objvals, subgrads
+        # Collect objvals, subgrads
+        objvals_combined = parallel.combine_dict(objvals)
+        objvals_vec = Vector{Float64}(undef, length(objvals_combined))
+        if parallel.myid() == 0
+            for (k,v) in objvals_combined
+                objvals_vec[k] = v
+            end
+        end
+        subgrads_combined = parallel.combine_dict(subgrads)
+
+        return objvals_vec, subgrads_combined
     end
 
-    if parallel.myid() == 0
-        # We assume that the block models are distributed.
-        num_all_blocks = parallel.sum(num_blocks(LD))
+    # We assume that the block models are distributed.
+    num_all_blocks = parallel.sum(num_blocks(LD))
 
+    if parallel.myid() == 0
         # Create bundle method instance
         bundle = LD.bundle_method(num_coupling_variables(LD), num_all_blocks, solveLagrangeDual)
         BM.get_model(bundle).user_data = LD
@@ -187,10 +203,12 @@ end
 This adjusts the objective function of each Lagrangian subproblem.
 """
 function adjust_objective_function!(LD::LagrangeDual, var::CouplingVariableRef, λ::Float64)
-    affobj = objective_function(LD, var.block_id)
-    @assert typeof(affobj) == AffExpr
-    coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] + λ : λ
-    JuMP.set_objective_coefficient(block_model(LD, var.block_id), var.ref, coef)
+    if has_block_model(LD, var.block_id)
+        affobj = objective_function(LD, var.block_id)
+        @assert typeof(affobj) == AffExpr
+        coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] + λ : λ
+        JuMP.set_objective_coefficient(block_model(LD, var.block_id), var.ref, coef)
+    end
 end
 
 
@@ -198,10 +216,12 @@ end
 This resets the objective function of each Lagrangian subproblem.
 """
 function reset_objective_function!(LD::LagrangeDual, var::CouplingVariableRef, λ::Float64)
-    affobj = objective_function(LD, var.block_id)
-    @assert typeof(affobj) == AffExpr
-    coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] - λ : -λ
-    JuMP.set_objective_coefficient(block_model(LD, var.block_id), var.ref, coef)
+    if has_block_model(LD, var.block_id)
+        affobj = objective_function(LD, var.block_id)
+        @assert typeof(affobj) == AffExpr
+        coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] - λ : -λ
+        JuMP.set_objective_coefficient(block_model(LD, var.block_id), var.ref, coef)
+    end
 end
 
 """

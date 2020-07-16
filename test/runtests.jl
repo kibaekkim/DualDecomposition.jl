@@ -1,9 +1,10 @@
 using Test
 using DualDecomposition
 using JuMP, Ipopt, GLPK
+using MPI
 
 const DD = DualDecomposition
-
+#=
 @testset "farmer" begin
     NS = 3  # number of scenarios
     probability = ones(3) / 3
@@ -185,6 +186,12 @@ const DD = DualDecomposition
             @test isapprox(DD.dual_objective_value(algo), objval, rtol=1e-3)
         end
     end
+end
+=#
+@testset "MPI tests" begin
+    testdir = @__DIR__
+    mpiexec(cmd ->run(`$cmd -np 2 $(Base.julia_cmd()) $(joinpath(testdir, "parallel.jl"))`))
+    mpiexec(cmd ->run(`$cmd -np 3 $(Base.julia_cmd()) $(joinpath(testdir, "../examples/farmer_mpi.jl"))`))
 end
 
 # include("../examples/farmer.jl")

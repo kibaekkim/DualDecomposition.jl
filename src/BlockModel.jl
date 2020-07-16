@@ -71,6 +71,13 @@ This returns a `JuMP.Model` object for a given `block_id`.
 block_model(block_model::BlockModel, block_id::Integer) = block_model.model[block_id]
 
 """
+    has_block_model
+
+This returns true if `block_model::BlockModel` has key `block_id::Integer`; false otherwise.
+"""
+has_block_model(block_model::BlockModel, block_id::Integer) = haskey(block_model.model, block_id)
+
+"""
     num_coupling_variables
 
 This returns the number of coupling variables in `block_model::BlockModel`.

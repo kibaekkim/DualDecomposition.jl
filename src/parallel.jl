@@ -1,5 +1,6 @@
 module parallel
 using MPI
+using SparseArrays
 
 function init()
     if !MPI.Initialized()
@@ -52,37 +53,83 @@ function sum(x::Number)
     end
 end
 
+function deserialize!(serialized, counts::Vector{Cint}, x::Vector{T}) where {T}
+    @assert length(serialized) == Base.sum(counts)
+    sind = 1
+    eind = 0
+    for i in 1:length(counts)
+        eind += counts[i]
+        xs = MPI.deserialize(serialized[sind:eind])
+        for j in xs
+            push!(x, j)
+        end
+        sind += counts[i]
+    end
+end
+
+function allcollect(x::Vector{T}) where {T}
+    if nprocs() > 1
+        x_serialized = MPI.serialize(x)
+        counts::Vector{Cint} = MPI.Allgatherv([length(x_serialized)], ones(Cint, nprocs()), MPI.COMM_WORLD)
+        collect_serialized = MPI.Allgatherv(x_serialized, counts, MPI.COMM_WORLD)
+        x = Vector{T}()
+        deserialize!(collect_serialized, counts, x)
+    end
+    return x
+end
+
 function collect(x::Vector{T}) where {T}
-    if nprocs() == 1
-        return x
-    else
-        counts = MPI.Allgatherv(length(x), 1, MPI.COMM_WORLD)
-        return MPI.Allgatherv(x, counts, MPI.COMM_WORLD)
-    end
-end
-
-function reduce(x::Array{T,1}) where {T<:Number}
-    counts = Cint[size(mylist[i],1) for i in 1:size(mylist,1)]
-    res=MPI.Allgatherv(x, counts, MPI.COMM_WORLD)
-end
-
-function reduce(x::Array{Float64,2})
-    counts = Cint[size(mylist[i],1)*size(x,2) for i in 1:size(mylist,1)]
-    countssum::Int64=sum(counts)/size(x,2)
-    buf=Array{Float64,1}(undef, size(x,1)*size(x,2))
-    for i in 1:size(x,1)
-        for j in 1:size(x,2)
-            buf[(i-1)*size(x,2)+j] = x[i,j]
+    if nprocs() > 1
+        x_serialized = MPI.serialize(x)
+        counts::Vector{Cint} = MPI.Allgatherv([length(x_serialized)], ones(Cint, nprocs()), MPI.COMM_WORLD)
+        collect_serialized = MPI.Gatherv(x_serialized, counts, 0, MPI.COMM_WORLD)
+        if myid() == 0
+            x = Vector{T}()
+            deserialize!(collect_serialized, counts, x)
         end
     end
-    res=MPI.Allgatherv(buf, counts, MPI.COMM_WORLD)
-    ret=Array{Float64,2}(undef, countssum, size(x,2))
-    for i in 1:countssum
-        for j in 1:size(x,2)
-            ret[i,j]=res[(i-1)*size(x,2)+j]
+    return x
+end
+
+function combine_dict(x::Dict{Int,Float64})
+    if nprocs() > 1
+        ks = Vector{Int}()
+        vs = Vector{Float64}()
+        for (k,v) in x
+            push!(ks,k)
+            push!(vs,v)
+        end
+        counts::Vector{Cint} = MPI.Allgatherv([length(ks)], ones(Cint, nprocs()), MPI.COMM_WORLD)
+        ks_collected = MPI.Gatherv(ks, counts, 0, MPI.COMM_WORLD)
+        vs_collected = MPI.Gatherv(vs, counts, 0, MPI.COMM_WORLD)
+        if myid() == 0
+            for i in 1:length(ks_collected)
+                x[ks_collected[i]] = vs_collected[i]
+            end
         end
     end
-    ret
+    return x
+end
+
+function combine_dict(x::Dict{Int,SparseVector{Float64}})
+    if nprocs() > 1
+        ks = Vector{Int}()
+        vs = Vector{SparseVector{Float64}}()
+        for (k,v) in x
+            push!(ks,k)
+            push!(vs,v)
+        end
+        counts::Vector{Cint} = MPI.Allgatherv([length(ks)], ones(Cint, nprocs()), MPI.COMM_WORLD)
+        ks_collected = MPI.Gatherv(ks, counts, 0, MPI.COMM_WORLD)
+        vs_collected = collect(vs)
+        if myid() == 0
+            @assert length(vs_collected) == Base.sum(counts)
+            for i in 1:length(ks_collected)
+                x[ks_collected[i]] = vs_collected[i]
+            end
+        end
+    end
+    return x
 end
 
 function bcast(buf)

@@ -46,10 +46,11 @@ coupling_variables(LD::LagrangeDual) = coupling_variables(LD.block_model)
 
 function set_coupling_variables!(LD::LagrangeDual, variables::Vector{CouplingVariableRef})
     set_coupling_variables!(LD.block_model, variables)
+    variable_keys = [v.key for v in variables]
     # collect all coupling variables
-    all_variables = parallel.allcollect(variables)
-    set_variables_by_couple!(LD.block_model, all_variables)
-    LD.var_to_index = Dict((v.block_id,v.coupling_id) => i for (i,v) in enumerate(all_variables))
+    all_variable_keys = parallel.allcollect(variable_keys)
+    set_variables_by_couple!(LD.block_model, all_variable_keys)
+    LD.var_to_index = Dict((v.block_id,v.coupling_id) => i for (i,v) in enumerate(all_variable_keys))
 end
 
 dual_objective_value(LD::LagrangeDual) = dual_objective_value(LD.block_model)
@@ -106,8 +107,8 @@ function run!(LD::LagrangeDual, optimizer)
 
         # Get subgradients
         for var in coupling_variables(LD)
-            @assert has_block_model(LD, var.block_id)
-            subgrads[var.block_id][index_of_λ(LD, var)] = -JuMP.value(var.ref)
+            # @assert has_block_model(LD, var.key.block_id)
+            subgrads[var.key.block_id][index_of_λ(LD, var)] = -JuMP.value(var.ref)
         end
 
         # Reset objective coefficients
@@ -185,11 +186,11 @@ end
 This adjusts the objective function of each Lagrangian subproblem.
 """
 function adjust_objective_function!(LD::LagrangeDual, var::CouplingVariableRef, λ::Float64)
-    @assert has_block_model(LD, var.block_id)
-    affobj = objective_function(LD, var.block_id)
+    @assert has_block_model(LD, var.key.block_id)
+    affobj = objective_function(LD, var.key.block_id)
     @assert typeof(affobj) == AffExpr
     coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] + λ : λ
-    JuMP.set_objective_coefficient(block_model(LD, var.block_id), var.ref, coef)
+    JuMP.set_objective_coefficient(block_model(LD, var.key.block_id), var.ref, coef)
 end
 
 
@@ -197,11 +198,11 @@ end
 This resets the objective function of each Lagrangian subproblem.
 """
 function reset_objective_function!(LD::LagrangeDual, var::CouplingVariableRef, λ::Float64)
-    @assert has_block_model(LD, var.block_id)
-    affobj = objective_function(LD, var.block_id)
+    @assert has_block_model(LD, var.key.block_id)
+    affobj = objective_function(LD, var.key.block_id)
     @assert typeof(affobj) == AffExpr
     coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] - λ : -λ
-    JuMP.set_objective_coefficient(block_model(LD, var.block_id), var.ref, coef)
+    JuMP.set_objective_coefficient(block_model(LD, var.key.block_id), var.ref, coef)
 end
 
 """
@@ -209,4 +210,5 @@ Wrappers of other functions
 """
 objective_function(LD::LagrangeDual, block_id::Integer) = JuMP.objective_function(block_model(LD, block_id), QuadExpr).aff
 
-index_of_λ(LD::LagrangeDual, var::CouplingVariableRef) = LD.var_to_index[var.block_id,var.coupling_id]
+index_of_λ(LD::LagrangeDual, var::CouplingVariableKey) = LD.var_to_index[var.block_id,var.coupling_id]
+index_of_λ(LD::LagrangeDual, var::CouplingVariableRef) = index_of_λ(LD, var.key)

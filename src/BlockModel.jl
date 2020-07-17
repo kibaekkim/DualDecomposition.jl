@@ -1,18 +1,31 @@
 """
-CouplingVariableRef
+    CouplingVariableKey
 
-Coupling variable reference. `block_id` identifies the problem block containing 
-the variable, `coupling_id` identifies a set of variables whose values are equal,
-and `ref` contains the `JuMP.VariableRef` of the coupling variable.
+Key to map oupling variables. `block_id` identifies the problem block containing 
+the variable, and `coupling_id` identifies a set of variables whose values are equal.
 """
-struct CouplingVariableRef
+struct CouplingVariableKey
     block_id::Int
     coupling_id
-    ref::JuMP.VariableRef
 end
 
 """
-BlockModel
+    CouplingVariableRef
+
+Coupling variable reference with `key::CouplingVariableKey`.
+"""
+struct CouplingVariableRef
+    key::CouplingVariableKey
+    ref::JuMP.VariableRef
+    function CouplingVariableRef(key::CouplingVariableKey, ref::JuMP.VariableRef)
+        return new(key, ref)
+    end
+end
+
+CouplingVariableRef(block_id::Int, coupling_id, ref::JuMP.VariableRef) = CouplingVariableRef(CouplingVariableKey(block_id, coupling_id), ref)
+
+"""
+    BlockModel
 
 Block model struture contrains a set of `JuMP.Model` objects, each of which
 represents a sub-block model with the information of how to couple these block
@@ -21,7 +34,7 @@ models.
 mutable struct BlockModel
     model::Dict{Int,JuMP.Model} # Dictionary of block models
     coupling_variables::Vector{CouplingVariableRef} # array of variables that couple block models
-    variables_by_couple::Dict{Any,Vector{CouplingVariableRef}} # maps `couple_id` to `CouplingVariableRef`
+    variables_by_couple::Dict{Any,Vector{CouplingVariableKey}} # maps `couple_id` to `CouplingVariableKey`
 
     dual_bound::Float64
     dual_solution::Vector{Float64}
@@ -41,7 +54,7 @@ mutable struct BlockModel
 end
 
 """
-add_block_model!
+    add_block_model!
 
 Add block model `model` to `block_model::BlockModel` with `block_id`.
 """
@@ -50,7 +63,7 @@ function add_block_model!(block_model::BlockModel, block_id::Integer, model::JuM
 end
 
 """
-num_blocks
+    num_blocks
 
 Number of blocks in `block_model::BlockModel`
 """
@@ -105,7 +118,7 @@ end
 
 This sets `BlockModel.variables_by_couple`.
 """
-function set_variables_by_couple!(block_model::BlockModel, variables::Vector{CouplingVariableRef})
+function set_variables_by_couple!(block_model::BlockModel, variables::Vector{CouplingVariableKey})
     block_model.variables_by_couple = Dict(v.coupling_id => [] for v in variables)
     for v in variables
         push!(block_model.variables_by_couple[v.coupling_id], v)

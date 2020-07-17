@@ -75,6 +75,7 @@ function run!(LD::LagrangeDual, optimizer)
     end
 
     function solveLagrangeDual(λ::Array{Float64,1})
+        # TODO: change this assertion to when we have more user-defined variables
         @assert length(λ) == num_all_coupling_variables
 
         # broadcast λ
@@ -150,6 +151,10 @@ function run!(LD::LagrangeDual, optimizer)
     
         # Add bounding constraints to the Lagrangian master
         add_constraints!(LD, bundle)
+
+        # TODO: Add user-defined variables and constraints
+        #   watchout for the change in number of variables
+        # add_user_constraints()
 
         # This runs the bundle method.
         BM.run!(bundle)

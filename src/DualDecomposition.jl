@@ -23,6 +23,7 @@ Empty function for `AbstractMethod`
 """
 function run! end
 
+include("parallel.jl")
 include("BlockModel.jl")
 include("LagrangeDual.jl")
 

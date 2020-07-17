@@ -14,14 +14,21 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractMethod
     maxiter::Int # maximum number of iterations
     tol::Float64 # convergence tolerance
 
+    user_constraints
+    user_args
+
     function LagrangeDual(T = BM.ProximalMethod, 
-            maxiter::Int = 1000, tol::Float64 = 1e-6)
+            maxiter::Int = 1000, tol::Float64 = 1e-6,
+            user_constraints = nothing; kwargs...)
         LD = new{T}()
         LD.block_model = BlockModel()
         LD.var_to_index = Dict()
         LD.bundle_method = T
         LD.maxiter = maxiter
         LD.tol = tol
+
+        LD.user_constraints = user_constraints
+        LD.user_args = kwargs
 
         parallel.init()
         finalizer(finalize!, LD)
@@ -75,7 +82,6 @@ function run!(LD::LagrangeDual, optimizer)
     end
 
     function solveLagrangeDual(λ::Array{Float64,1})
-        # TODO: change this assertion to when we have more user-defined variables
         @assert length(λ) == num_all_coupling_variables
 
         # broadcast λ
@@ -152,9 +158,8 @@ function run!(LD::LagrangeDual, optimizer)
         # Add bounding constraints to the Lagrangian master
         add_constraints!(LD, bundle)
 
-        # TODO: Add user-defined variables and constraints
-        #   watchout for the change in number of variables
-        # add_user_constraints()
+        # Add user-defined variables and constraints
+        add_user_constraints!(LD, bundle)
 
         # This runs the bundle method.
         BM.run!(bundle)
@@ -185,6 +190,19 @@ function add_constraints!(LD::LagrangeDual, method::BM.AbstractMethod)
     for (id, vars) in LD.block_model.variables_by_couple
         @constraint(model, sum(λ[index_of_λ(LD, v)] for v in vars) == 0)
     end
+end
+
+"""
+This adds the user constraints to the Lagrangian master problem.
+"""
+function add_user_constraints!(LD::LagrangeDual, method::BM.AbstractMethod)
+    model = BM.get_jump_model(method)
+    if !isnothing(LD.user_constraints)
+        LD.user_constraints(LD, model)
+    end
+    #for (id, vars) in LD.block_model.variables_by_couple
+    #    @constraint(model, sum(λ[index_of_λ(LD, v)] for v in vars) == 0)
+    #end
 end
 
 """

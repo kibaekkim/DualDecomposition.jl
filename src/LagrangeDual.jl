@@ -194,19 +194,6 @@ function add_constraints!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
 end
 
 """
-This adds the user constraints to the Lagrangian master problem.
-"""
-function add_user_constraints!(LD::LagrangeDual, method::BM.AbstractMethod)
-    model = BM.get_jump_model(method)
-    if !isnothing(LD.user_constraints)
-        LD.user_constraints(LD, model)
-    end
-    #for (id, vars) in LD.block_model.variables_by_couple
-    #    @constraint(model, sum(λ[index_of_λ(LD, v)] for v in vars) == 0)
-    #end
-end
-
-"""
 This adjusts the objective function of each Lagrangian subproblem.
 """
 function adjust_objective_function!(LD::AbstractLagrangeDual, var::CouplingVariableRef, λ::Float64)
@@ -216,7 +203,6 @@ function adjust_objective_function!(LD::AbstractLagrangeDual, var::CouplingVaria
     coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] + λ : λ
     JuMP.set_objective_coefficient(block_model(LD, var.key.block_id), var.ref, coef)
 end
-
 
 """
 This resets the objective function of each Lagrangian subproblem.

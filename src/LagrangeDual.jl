@@ -18,21 +18,14 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
     maxiter::Int # maximum number of iterations
     tol::Float64 # convergence tolerance
 
-    user_constraints
-    user_args
-
     function LagrangeDual(T = BM.ProximalMethod, 
-            maxiter::Int = 1000, tol::Float64 = 1e-6,
-            user_constraints = nothing; kwargs...)
+            maxiter::Int = 1000, tol::Float64 = 1e-6)
         LD = new{T}()
         LD.block_model = BlockModel()
         LD.var_to_index = Dict()
         LD.bundle_method = T
         LD.maxiter = maxiter
         LD.tol = tol
-
-        LD.user_constraints = user_constraints
-        LD.user_args = kwargs
 
         parallel.init()
         finalizer(finalize!, LD)

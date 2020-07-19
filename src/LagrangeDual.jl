@@ -178,7 +178,7 @@ end
 """
 This adds the bounding constraints to the Lagrangian master problem.
 """
-function add_constraints!(LD::LagrangeDual, method::BM.AbstractMethod)
+function add_constraints!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
     model = BM.get_jump_model(method)
     λ = model[:x]
     for (id, vars) in LD.block_model.variables_by_couple

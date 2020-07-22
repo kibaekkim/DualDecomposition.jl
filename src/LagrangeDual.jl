@@ -1,4 +1,4 @@
-
+using Debugging
 abstract type AbstractLagrangeDual <: AbstractMethod end
 
 """
@@ -125,6 +125,7 @@ function run!(LD::AbstractLagrangeDual, optimizer)
         # Collect objvals, subgrads
         objvals_combined = parallel.combine_dict(objvals)
         objvals_vec = Vector{Float64}(undef, length(objvals_combined))
+        @bp
         if parallel.is_root()
             for (k,v) in objvals_combined
                 objvals_vec[k] = v

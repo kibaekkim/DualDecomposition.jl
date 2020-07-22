@@ -1,4 +1,4 @@
-using Debugging
+using Debugger
 abstract type AbstractLagrangeDual <: AbstractMethod end
 
 """

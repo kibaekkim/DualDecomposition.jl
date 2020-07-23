@@ -162,7 +162,7 @@ function run!(LD::AbstractLagrangeDual, optimizer)
         LD.block_model.dual_bound = -BM.get_objective_value(bundle)
     
         # get dual solution
-        LD.block_model.dual_solution = copy(BM.get_solution(bundle))
+        LD.block_model.dual_solution = get_solution(LD, bundle)#copy(BM.get_solution(bundle))
 
         # broadcast we are done.
         parallel.bcast(Float64[])
@@ -178,7 +178,7 @@ end
 """
 This adds the bounding constraints to the Lagrangian master problem.
 """
-function add_constraints!(LD::LagrangeDual, method::BM.AbstractMethod)
+function add_constraints!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
     model = BM.get_jump_model(method)
     λ = model[:x]
     for (id, vars) in LD.block_model.variables_by_couple
@@ -215,3 +215,11 @@ objective_function(LD::AbstractLagrangeDual, block_id::Integer) = JuMP.objective
 
 index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableKey) = LD.var_to_index[var.block_id,var.coupling_id]
 index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableRef) = index_of_λ(LD, var.key)
+
+
+"""
+This gets dual solutions
+"""
+function get_solution(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
+    return copy(BM.get_solution(method))
+end

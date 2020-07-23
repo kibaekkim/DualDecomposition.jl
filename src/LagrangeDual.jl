@@ -125,8 +125,6 @@ function run!(LD::AbstractLagrangeDual, optimizer)
         # Collect objvals, subgrads
         objvals_combined = parallel.combine_dict(objvals)
         objvals_vec = Vector{Float64}(undef, length(objvals_combined))
-        println(objvals_combined)
-        println(length(objvals_combined))
         if parallel.is_root()
             for (k,v) in objvals_combined
                 objvals_vec[k] = v

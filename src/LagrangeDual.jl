@@ -165,10 +165,10 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
         BM.run!(bundle)
 
         # get dual objective value
-        LD.block_model.dual_bound = -BM.get_objective_value(bundle)
+        get_objective!(LD, bundle)
     
         # get dual solution
-        LD.block_model.dual_solution = get_solution(LD, bundle)#copy(BM.get_solution(bundle))
+        get_solution!(LD, bundle)
 
         # broadcast we are done.
         parallel.bcast(Float64[])
@@ -224,8 +224,12 @@ index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableRef) = index_of_λ(LD
 
 
 """
-This gets dual solutions
+These get dual objective and solutions
 """
-function get_solution(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
-    return copy(BM.get_solution(method))
+function get_objective!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
+    LD.block_model.dual_bound = -BM.get_objective_value(method)
+end
+
+function get_solution!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
+    LD.block_model.dual_solution = copy(BM.get_solution(method))
 end

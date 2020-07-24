@@ -66,11 +66,17 @@ dual_solution(LD::AbstractLagrangeDual) = dual_solution(LD.block_model)
 This runs the Lagrangian dual method for solving the block model. `optimizer`
 specifies the optimization solver used for `BundleMethod` package.
 """
-function run!(LD::AbstractLagrangeDual, optimizer)
+function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Array{Float64}} = nothing)
 
     # We assume that the block models are distributed.
     num_all_blocks = parallel.sum(num_blocks(LD))
     num_all_coupling_variables = parallel.sum(num_coupling_variables(LD))
+
+    # initialize bundle_init if it is nothing
+    if isnothing(bundle_init)
+        bundle_init = zeros(num_all_coupling_variables)
+    end
+    @assert length(bundle_init) == num_all_coupling_variables
 
     # check the validity of LagrangeDual
     if num_all_blocks <= 0 || num_all_coupling_variables == 0
@@ -137,7 +143,7 @@ function run!(LD::AbstractLagrangeDual, optimizer)
 
     if parallel.is_root()
         # Create bundle method instance
-        bundle = LD.bundle_method(num_all_coupling_variables, num_all_blocks, solveLagrangeDual)
+        bundle = LD.bundle_method(num_all_coupling_variables, num_all_blocks, solveLagrangeDual, bundle_init)
         BM.get_model(bundle).user_data = LD
     
         # Set optimizer to the JuMP model

@@ -11,7 +11,7 @@ version = "0.5.0"
 
 [[BundleMethod]]
 deps = ["JuMP", "LinearAlgebra", "Printf", "SparseArrays"]
-git-tree-sha1 = "d339cb47b17a809061fa538aef9dd7e2356af16b"
+git-tree-sha1 = "00df8adcb2c6a20a6fad0a8af975cb3fa2a26209"
 repo-rev = "DRMS"
 repo-url = "https://github.com/kibaekkim/BundleMethod.jl.git"
 uuid = "e8a6717a-069f-43d5-9ac2-a49b1ec5be7b"

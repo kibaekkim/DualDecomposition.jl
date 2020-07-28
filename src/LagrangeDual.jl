@@ -97,6 +97,13 @@ function run!(LD::LagrangeDual, optimizer)
 
             # Solver the Lagrange dual
             JuMP.optimize!(m)
+            solve_itr = 0
+            while !(JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]) && solve_itr < 10
+                JuMP.set_start_value.(all_variables(m), rand())
+                JuMP.optimize!(m)
+                solve_itr += 1
+            end
+
             @assert JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
 
             # We may want consider other statuses.

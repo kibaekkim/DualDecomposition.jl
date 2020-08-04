@@ -54,7 +54,7 @@ function get_future(tree::AbstractTree, root_id::Int)::Array{Int}
     #   output list of all leaf node IDs branching from root_id
     arr_leaves = Int[]
 
-    function iterate_children(tree::Tree, id::Int)
+    function iterate_children(tree::AbstractTree, id::Int)
         children = get_children(tree, id)
         if length(children) == 0
             #buffer output

@@ -22,15 +22,10 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractMethod
         LD.bundle_method = T
         LD.maxiter = maxiter
         LD.tol = tol
-
-        parallel.init()
-        finalizer(finalize!, LD)
         
         return LD
     end
 end
-
-finalize!(LD::LagrangeDual) = parallel.finalize()
 
 """
 Wrappers of the functions defined for `BlockModel`

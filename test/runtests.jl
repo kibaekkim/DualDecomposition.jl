@@ -198,6 +198,37 @@ end
     mpiexec(cmd ->run(`$cmd -np 3 $(Base.julia_cmd()) $(joinpath(testdir, "../examples/farmer_mpi.jl"))`))
 end
 
+@testset "investment" begin
+    include("../examples/investment.jl")
+
+    # generate tree data structure
+    tree = create_tree(K,L)
+    
+    @testset "ProximalMethod" begin
+        # Create DualDecomposition instance.
+        algo = DD.LagrangeDual(BM.ProximalMethod)
+
+        # compute dual decomposition method
+        dual_decomp!(L, tree, algo)
+
+        @show DD.dual_objective_value(algo)
+        @show DD.dual_solution(algo)
+        @test isapprox(DD.dual_objective_value(algo), -171.75, rtol=1e-3)
+    end
+
+    @testset "TrustRegionMethod" begin
+        # Create DualDecomposition instance.
+        algo = DD.LagrangeDual(BM.TrustRegionMethod)
+
+        # compute dual decomposition method
+        dual_decomp!(L, tree, algo)
+
+        @show DD.dual_objective_value(algo)
+        @show DD.dual_solution(algo)
+        @test isapprox(DD.dual_objective_value(algo), -171.75, rtol=1e-3)
+    end
+end
+
 # include("../examples/farmer.jl")
 # include("../examples/dcap.jl")
 # include("../examples/qdcap.jl") # Need CPLEX

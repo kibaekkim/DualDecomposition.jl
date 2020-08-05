@@ -145,14 +145,15 @@ function main_comp()
     # generate tree data structure
     tree = create_tree(K,L)
 
+    # Create DualDecomposition instance.
+    algo = DD.LagrangeDual(BM.TrustRegionMethod)
+
     # compute dual decomposition method
-    LD = dual_decomp(L, tree)
+    dual_decomp!(L, tree, algo)
 end
 
 
-function dual_decomp(L::Int, tree::DD.Tree)
-    # Create DualDecomposition instance.
-    algo = DD.LagrangeDual(BM.TrustRegionMethod)
+function dual_decomp!(L::Int, tree::DD.Tree, algo::DD.LagrangeDual)
 
     # Add Lagrange dual problem for each scenario s.
     nodelist = DD.get_stage_id(tree)
@@ -193,6 +194,5 @@ function dual_decomp(L::Int, tree::DD.Tree)
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
     DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
-    return algo
 end
 

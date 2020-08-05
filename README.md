@@ -15,7 +15,7 @@ the following features that `DSP` does not provide:
 
 This package can be installed by cloning this repository:
 ```julia
-] add https://github.com/kibaekkim/DualDecomposition.jl
+] add DualDecomposition
 ```
 
 ## Examples

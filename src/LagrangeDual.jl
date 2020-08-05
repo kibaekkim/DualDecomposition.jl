@@ -26,15 +26,10 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
         LD.bundle_method = T
         LD.maxiter = maxiter
         LD.tol = tol
-
-        parallel.init()
-        finalizer(finalize!, LD)
         
         return LD
     end
 end
-
-finalize!(LD::AbstractLagrangeDual) = parallel.finalize()
 
 """
 Wrappers of the functions defined for `BlockModel`
@@ -107,6 +102,8 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
 
             # Solver the Lagrange dual
             JuMP.optimize!(m)
+            reoptimize!(m)
+
             @assert JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
 
             # We may want consider other statuses.
@@ -212,6 +209,18 @@ function reset_objective_function!(LD::AbstractLagrangeDual, var::CouplingVariab
     @assert typeof(affobj) == AffExpr
     coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] - λ : -λ
     JuMP.set_objective_coefficient(block_model(LD, var.key.block_id), var.ref, coef)
+end
+
+"""
+This re-optimizes block models if not solved to local optimality
+"""
+function reoptimize!(model::JuMP.Model)
+    solve_itr = 0
+    while !(JuMP.termination_status(model) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]) && solve_itr < 10
+        JuMP.set_start_value.(all_variables(model), rand())
+        JuMP.optimize!(model)
+        solve_itr += 1
+    end
 end
 
 """

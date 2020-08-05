@@ -37,15 +37,18 @@ function create_scenario_model(s::Int64)
     return m
 end
 
+# Initialize MPI
+parallel.init()
+
 # Create DualDecomposition instance.
 algo = DD.LagrangeDual()
 
 # partition scenarios into processes
-@time parallel.partition(NS)
+parallel.partition(NS)
 
 # Add Lagrange dual problem for each scenario s.
 models = Dict{Int,JuMP.Model}(s => create_scenario_model(s) for s in parallel.getpartition())
-@time for s in parallel.getpartition()
+for s in parallel.getpartition()
     DD.add_block_model!(algo, s, models[s])
 end
 
@@ -59,7 +62,10 @@ for s in parallel.getpartition()
 end
 
 # Set nonanticipativity variables as an array of symbols.
-@time DD.set_coupling_variables!(algo, coupling_variables)
+DD.set_coupling_variables!(algo, coupling_variables)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+
+# Finalize MPI
+parallel.finalize()

@@ -1,3 +1,6 @@
+
+abstract type AbstractLagrangeDual <: AbstractMethod end
+
 """
     LagrangeDual
 
@@ -7,7 +10,8 @@ Lagrangian dual method for dual decomposition. This `mutable struct` constains:
     - `masiter::Int` sets the maximum number of iterations
     - `tol::Float64` sets the relative tolerance for termination
 """
-mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractMethod
+
+mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
     block_model::BlockModel
     var_to_index::Dict{Tuple{Int,Any},Int} # maps coupling variable to the index wrt the master problem
     bundle_method
@@ -31,15 +35,15 @@ end
 Wrappers of the functions defined for `BlockModel`
 """
 
-add_block_model!(LD::LagrangeDual, block_id::Integer, model::JuMP.Model) = add_block_model!(LD.block_model, block_id, model)
-num_blocks(LD::LagrangeDual) = num_blocks(LD.block_model)
-block_model(LD::LagrangeDual, block_id::Integer) = block_model(LD.block_model, block_id)
-block_model(LD::LagrangeDual) = block_model(LD.block_model)
-has_block_model(LD::LagrangeDual, block_id::Integer) = has_block_model(LD.block_model, block_id)
-num_coupling_variables(LD::LagrangeDual) = num_coupling_variables(LD.block_model)
-coupling_variables(LD::LagrangeDual) = coupling_variables(LD.block_model)
+add_block_model!(LD::AbstractLagrangeDual, block_id::Integer, model::JuMP.Model) = add_block_model!(LD.block_model, block_id, model)
+num_blocks(LD::AbstractLagrangeDual) = num_blocks(LD.block_model)
+block_model(LD::AbstractLagrangeDual, block_id::Integer) = block_model(LD.block_model, block_id)
+block_model(LD::AbstractLagrangeDual) = block_model(LD.block_model)
+has_block_model(LD::AbstractLagrangeDual, block_id::Integer) = has_block_model(LD.block_model, block_id)
+num_coupling_variables(LD::AbstractLagrangeDual) = num_coupling_variables(LD.block_model)
+coupling_variables(LD::AbstractLagrangeDual) = coupling_variables(LD.block_model)
 
-function set_coupling_variables!(LD::LagrangeDual, variables::Vector{CouplingVariableRef})
+function set_coupling_variables!(LD::AbstractLagrangeDual, variables::Vector{CouplingVariableRef})
     set_coupling_variables!(LD.block_model, variables)
     variable_keys = [v.key for v in variables]
     # collect all coupling variables
@@ -48,20 +52,26 @@ function set_coupling_variables!(LD::LagrangeDual, variables::Vector{CouplingVar
     LD.var_to_index = Dict((v.block_id,v.coupling_id) => i for (i,v) in enumerate(all_variable_keys))
 end
 
-dual_objective_value(LD::LagrangeDual) = dual_objective_value(LD.block_model)
-dual_solution(LD::LagrangeDual) = dual_solution(LD.block_model)
+dual_objective_value(LD::AbstractLagrangeDual) = dual_objective_value(LD.block_model)
+dual_solution(LD::AbstractLagrangeDual) = dual_solution(LD.block_model)
 
 """
-    run!(LD::LagrangeDual, optimizer)
+    run!(LD::AbstractLagrangeDual, optimizer)
 
 This runs the Lagrangian dual method for solving the block model. `optimizer`
 specifies the optimization solver used for `BundleMethod` package.
 """
-function run!(LD::LagrangeDual, optimizer)
+function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Array{Float64}} = nothing)
 
     # We assume that the block models are distributed.
     num_all_blocks = parallel.sum(num_blocks(LD))
     num_all_coupling_variables = parallel.sum(num_coupling_variables(LD))
+
+    # initialize bundle_init if it is nothing
+    if isnothing(bundle_init)
+        bundle_init = zeros(num_all_coupling_variables)
+    end
+    @assert length(bundle_init) == num_all_coupling_variables
 
     # check the validity of LagrangeDual
     if num_all_blocks <= 0 || num_all_coupling_variables == 0
@@ -130,7 +140,7 @@ function run!(LD::LagrangeDual, optimizer)
 
     if parallel.is_root()
         # Create bundle method instance
-        bundle = LD.bundle_method(num_all_coupling_variables, num_all_blocks, solveLagrangeDual)
+        bundle = LD.bundle_method(num_all_coupling_variables, num_all_blocks, solveLagrangeDual, bundle_init)
         BM.get_model(bundle).user_data = LD
     
         # Set optimizer to the JuMP model
@@ -152,10 +162,10 @@ function run!(LD::LagrangeDual, optimizer)
         BM.run!(bundle)
 
         # get dual objective value
-        LD.block_model.dual_bound = -BM.get_objective_value(bundle)
+        get_objective!(LD, bundle)
     
         # get dual solution
-        LD.block_model.dual_solution = copy(BM.get_solution(bundle))
+        get_solution!(LD, bundle)
 
         # broadcast we are done.
         parallel.bcast(Float64[])
@@ -171,7 +181,7 @@ end
 """
 This adds the bounding constraints to the Lagrangian master problem.
 """
-function add_constraints!(LD::LagrangeDual, method::BM.AbstractMethod)
+function add_constraints!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
     model = BM.get_jump_model(method)
     λ = model[:x]
     for (id, vars) in LD.block_model.variables_by_couple
@@ -182,7 +192,7 @@ end
 """
 This adjusts the objective function of each Lagrangian subproblem.
 """
-function adjust_objective_function!(LD::LagrangeDual, var::CouplingVariableRef, λ::Float64)
+function adjust_objective_function!(LD::AbstractLagrangeDual, var::CouplingVariableRef, λ::Float64)
     @assert has_block_model(LD, var.key.block_id)
     affobj = objective_function(LD, var.key.block_id)
     @assert typeof(affobj) == AffExpr
@@ -193,7 +203,7 @@ end
 """
 This resets the objective function of each Lagrangian subproblem.
 """
-function reset_objective_function!(LD::LagrangeDual, var::CouplingVariableRef, λ::Float64)
+function reset_objective_function!(LD::AbstractLagrangeDual, var::CouplingVariableRef, λ::Float64)
     @assert has_block_model(LD, var.key.block_id)
     affobj = objective_function(LD, var.key.block_id)
     @assert typeof(affobj) == AffExpr
@@ -216,7 +226,19 @@ end
 """
 Wrappers of other functions
 """
-objective_function(LD::LagrangeDual, block_id::Integer) = JuMP.objective_function(block_model(LD, block_id), QuadExpr).aff
+objective_function(LD::AbstractLagrangeDual, block_id::Integer) = JuMP.objective_function(block_model(LD, block_id), QuadExpr).aff
 
-index_of_λ(LD::LagrangeDual, var::CouplingVariableKey) = LD.var_to_index[var.block_id,var.coupling_id]
-index_of_λ(LD::LagrangeDual, var::CouplingVariableRef) = index_of_λ(LD, var.key)
+index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableKey) = LD.var_to_index[var.block_id,var.coupling_id]
+index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableRef) = index_of_λ(LD, var.key)
+
+
+"""
+These get dual objective and solutions
+"""
+function get_objective!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
+    LD.block_model.dual_bound = -BM.get_objective_value(method)
+end
+
+function get_solution!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
+    LD.block_model.dual_solution = copy(BM.get_solution(method))
+end

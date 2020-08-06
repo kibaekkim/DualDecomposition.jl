@@ -26,5 +26,6 @@ function run! end
 include("parallel.jl")
 include("BlockModel.jl")
 include("LagrangeDual.jl")
+include("ScenarioTree.jl")
 
 end  # module DualDecomposition

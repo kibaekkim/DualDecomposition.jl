@@ -101,8 +101,7 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
             subgrads[id] = sparsevec(Dict{Int,Float64}(), length(λ))
 
             # Solver the Lagrange dual
-            JuMP.optimize!(m)
-            reoptimize!(m)
+            solve_sub_block!(m)
 
             @assert JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
 
@@ -209,6 +208,14 @@ function reset_objective_function!(LD::AbstractLagrangeDual, var::CouplingVariab
     @assert typeof(affobj) == AffExpr
     coef = haskey(affobj.terms, var.ref) ? affobj.terms[var.ref] - λ : -λ
     JuMP.set_objective_coefficient(block_model(LD, var.key.block_id), var.ref, coef)
+end
+
+"""
+This wraps the steps to optimize a block problem.
+"""
+function solve_sub_block!(model::JuMP.Model)
+    JuMP.optimize!(model)
+    reoptimize!(model)
 end
 
 """

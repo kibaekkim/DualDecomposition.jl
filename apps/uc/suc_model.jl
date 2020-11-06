@@ -1,34 +1,28 @@
 using JSON
-using CPLEX
 using JuMP
 
-function create_deterministic_model(num_scenarios_ = 1, data_file = "./data/model_data.json")
-
+function load_suc_data(data_file::String)
     # Read model data from file
     data = JSON.parsefile(data_file)
 
-    # How many scenarios?
-    (g,gen) = iterate(data["renewable_generators"])[1]
-    num_scenarios = ifelse(num_scenarios_ < 0, length(gen), num_scenarios_)
-    scenarios = 1:num_scenarios
-
     # Find slow- and fast-start generators
-    slow_start_gens = String[]
-    fast_start_gens = String[]
+    data["slow_generators"] = Dict{String,Dict}()
+    data["fast_generators"] = Dict{String,Dict}()
     for (g,gen) in data["thermal_generators"] 
         if gen["time_down_minimum"] <= 1 && gen["time_up_minimum"] <= 1
-            push!(fast_start_gens, g)
+            data["fast_generators"][g] = gen
         else
-            push!(slow_start_gens, g)
+            data["slow_generators"][g] = gen
         end
     end
-    data["slow_generators"] = Dict(
-        g => gen for (g, gen) in data["thermal_generators"] if in(g, slow_start_gens)
-    )
-    data["fast_generators"] = Dict(
-        g => gen for (g, gen) in data["thermal_generators"] if in(g, fast_start_gens)
-    )
 
+    return data
+end
+
+function create_suc_model(data::Dict, scenarios::UnitRange, objective_scale::Float64 = 1.0)
+
+    slow_start_gens = keys(data["slow_generators"])
+    fast_start_gens = keys(data["fast_generators"])
     thermal_gens = keys(data["thermal_generators"])
     renewable_gens = keys(data["renewable_generators"])
     time_periods = 1:data["time_periods"]
@@ -36,16 +30,9 @@ function create_deterministic_model(num_scenarios_ = 1, data_file = "./data/mode
     gen_startup_categories = Dict(g => 1:length(gen["startup"]) for (g,gen) in data["thermal_generators"])
     gen_pwl_points = Dict(g => 1:length(gen["piecewise_production"]) for (g,gen) in data["thermal_generators"])
 
-    @info "Found $num_scenarios scenarios"
-    @info "Found $(length(slow_start_gens)) slow-start generators"
-    @info "Found $(length(fast_start_gens)) fast-start generators"
-    @info "Found $(length(renewable_gens)) renewable generators"
-
-    m = Model(CPLEX.Optimizer)
-    set_optimizer_attribute(m, "CPX_PARAM_TILIM", 60.0)
+    m = Model()
 
     # First-stage variables
-
     @variable(m, ug[slow_start_gens,time_periods], binary=true) # Commitment status
     @variable(m, vg[slow_start_gens,time_periods], binary=true) # Startup status
     @variable(m, wg[slow_start_gens,time_periods], binary=true) # Shutdown status
@@ -56,7 +43,6 @@ function create_deterministic_model(num_scenarios_ = 1, data_file = "./data/mode
     @variable(m, vfg[fast_start_gens,time_periods,scenarios], binary=true) # Startup status
     @variable(m, wfg[fast_start_gens,time_periods,scenarios], binary=true) # Shutdown status
     @variable(m, delta_sfg[g in fast_start_gens,gen_startup_categories[g],time_periods,scenarios], binary=true) # Startup in category ?
-
     @variable(m, cg[thermal_gens,time_periods,scenarios]) # Production cost
     @variable(m, pg[thermal_gens,time_periods,scenarios] >= 0) # Thermal generation
     @variable(m, pw[renewable_gens,time_periods,scenarios] >= 0) # Renewable generation
@@ -65,27 +51,29 @@ function create_deterministic_model(num_scenarios_ = 1, data_file = "./data/mode
 
 
     @objective(m, Min,
-        # first-stage objective function terms
-        sum(
-            gen["piecewise_production"][1]["cost"]*ug[g,t] +
+        objective_scale * (
+            # first-stage objective function terms
             sum(
-                gen_startup["cost"]*delta_sg[g,i,t]
-            for (i, gen_startup) in enumerate(gen["startup"]))
-        for (g, gen) in data["slow_generators"], t in time_periods)
-        # second-stage objective function terms
-        + 1 / num_scenarios * (
-            sum(
+                gen["piecewise_production"][1]["cost"]*ug[g,t] +
                 sum(
-                    gen["piecewise_production"][1]["cost"]*ufg[g,t,s] +
+                    gen_startup["cost"]*delta_sg[g,i,t]
+                for (i, gen_startup) in enumerate(gen["startup"]))
+            for (g, gen) in data["slow_generators"], t in time_periods)
+            # second-stage objective function terms
+            + 1 / length(scenarios) * (
+                sum(
                     sum(
-                        gen_startup["cost"]*delta_sfg[g,i,t,s]
-                    for (i, gen_startup) in enumerate(gen["startup"]))
-                for (g, gen) in data["fast_generators"], t in time_periods) +
-                sum(cg[g,t,s] 
-                for t in time_periods, (g, gen) in data["thermal_generators"])
-            for s in scenarios)
+                        gen["piecewise_production"][1]["cost"]*ufg[g,t,s] +
+                        sum(
+                            gen_startup["cost"]*delta_sfg[g,i,t,s]
+                        for (i, gen_startup) in enumerate(gen["startup"]))
+                    for (g, gen) in data["fast_generators"], t in time_periods) +
+                    sum(cg[g,t,s] 
+                    for t in time_periods, (g, gen) in data["thermal_generators"])
+                for s in scenarios)
+            )
         )
-    );
+    )
 
     for (g, gen) in data["slow_generators"]
 
@@ -107,7 +95,7 @@ function create_deterministic_model(num_scenarios_ = 1, data_file = "./data/mode
 
         @constraint(m, [s in scenarios], pg[g,1,s] + rg[g,1,s] - gen["unit_on_t0"]*(gen["power_output_t0"] - gen["power_output_minimum"]) <= gen["ramp_up_limit"]) # (8)
         @constraint(m, [s in scenarios], gen["unit_on_t0"]*(gen["power_output_t0"] - gen["power_output_minimum"]) - pg[g,1,s] <= gen["ramp_down_limit"]) # (9)
-        @constraint(m, [s in scenarios], gen["unit_on_t0"]*(gen["power_output_t0"] - gen["power_output_minimum"]) <= gen["unit_on_t0"]*(gen["power_output_maximum"] - gen["power_output_minimum"]) - max(0, gen["power_output_maximum"] - gen["ramp_shutdown_limit"])*wg[g,1]) # (10)
+        @constraint(m, gen["unit_on_t0"]*(gen["power_output_t0"] - gen["power_output_minimum"]) <= gen["unit_on_t0"]*(gen["power_output_maximum"] - gen["power_output_minimum"]) - max(0, gen["power_output_maximum"] - gen["ramp_shutdown_limit"])*wg[g,1]) # (10)
     end
 
     for (g, gen) in data["fast_generators"]
@@ -228,5 +216,3 @@ function create_deterministic_model(num_scenarios_ = 1, data_file = "./data/mode
 
     return m
 end
-
-# optimize!(m)

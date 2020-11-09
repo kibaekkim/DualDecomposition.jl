@@ -12,6 +12,10 @@ function create_deterministic_model(num_scenarios_::Int = 1, data_file::String =
     num_scenarios = ifelse(num_scenarios_ < 0, length(gen), num_scenarios_)
     scenarios = 1:num_scenarios
 
+    slow_start_gens = keys(data["slow_generators"])
+    fast_start_gens = keys(data["fast_generators"])
+    renewable_gens = keys(data["renewable_generators"])
+
     @info "Found $(length(scenarios)) scenarios"
     @info "Found $(length(slow_start_gens)) slow-start generators"
     @info "Found $(length(fast_start_gens)) fast-start generators"

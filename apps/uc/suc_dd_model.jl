@@ -1,10 +1,14 @@
 using DualDecomposition
 using CPLEX
 const DD = DualDecomposition
+const Para = DD.parallel
 
 include("suc_model.jl")
 
-function create_decomposition_model(num_scenarios::Int = 1, data_file::String = "./data/model_data.json")
+function create_decomposition_model(
+    num_scenarios::Int = 1, 
+    partitions = 1:num_scenarios,
+    data_file::String = "./data/model_data.json")
 
     # Read model data from file
     data = load_suc_data(data_file)
@@ -37,8 +41,8 @@ function create_decomposition_model(num_scenarios::Int = 1, data_file::String = 
     algo = DD.LagrangeDual(BM.TrustRegionMethod)
 
     # Add Lagrange dual problem for each scenario s.
-    models = Dict{Int,JuMP.Model}(s => create_scenario_subproblem(s) for s in 1:num_scenarios)
-    for s in 1:num_scenarios
+    models = Dict{Int,JuMP.Model}(s => create_scenario_subproblem(s) for s in partitions)
+    for s in partitions
         DD.add_block_model!(algo, s, models[s])
     end
 
@@ -47,7 +51,7 @@ function create_decomposition_model(num_scenarios::Int = 1, data_file::String = 
         because `vg`, `wg`, and `delta_sg` will be implicitly determined for given `ug`.
     """
     coupling_variables = Vector{DD.CouplingVariableRef}()
-    for s in 1:num_scenarios
+    for s in partitions
         model = models[s]
         ug = model[:ug]
         for g in slow_start_gens, t in time_periods
@@ -64,7 +68,17 @@ end
 #=
 Example to use:
 
-algo = create_decomposition_model(2);
+# Initialize MPI
+Para.init()
+
+# Partition scenarios into processes
+Para.partition(num_scenarios)
+
+algo = create_decomposition_model(2, Para.getpartition());
+
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, optimizer_with_attributes(CPLEX.Optimizer, "CPX_PARAM_SCRIND" => 0))
+
+# Finalize MPI
+Para.finalize()
 =#

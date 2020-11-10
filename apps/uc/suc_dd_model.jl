@@ -42,20 +42,16 @@ function create_decomposition_model(num_scenarios::Int = 1, data_file::String = 
         DD.add_block_model!(algo, s, models[s])
     end
 
+    """
+    It is sufficient to have `ug` as the only coupling variables,
+        because `vg`, `wg`, and `delta_sg` will be implicitly determined for given `ug`.
+    """
     coupling_variables = Vector{DD.CouplingVariableRef}()
     for s in 1:num_scenarios
         model = models[s]
         ug = model[:ug]
-        vg = model[:vg]
-        wg = model[:wg]
-        delta_sg = model[:delta_sg]
         for g in slow_start_gens, t in time_periods
             push!(coupling_variables, DD.CouplingVariableRef(s, (g,t), ug[g,t]))
-            push!(coupling_variables, DD.CouplingVariableRef(s, (g,t), vg[g,t]))
-            push!(coupling_variables, DD.CouplingVariableRef(s, (g,t), wg[g,t]))
-            for cat in gen_startup_categories[g]
-                push!(coupling_variables, DD.CouplingVariableRef(s, (g,cat,t), delta_sg[g,cat,t]))
-            end
         end
     end
 
@@ -66,7 +62,9 @@ function create_decomposition_model(num_scenarios::Int = 1, data_file::String = 
 end
 
 #=
-algo = create_decomposition_model(2)
+Example to use:
+
+algo = create_decomposition_model(2);
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, optimizer_with_attributes(CPLEX.Optimizer, "CPX_PARAM_SCRIND" => 0))
 =#

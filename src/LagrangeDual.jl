@@ -17,6 +17,7 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
     bundle_method
     maxiter::Int # maximum number of iterations
     tol::Float64 # convergence tolerance
+    bundle_method_object
 
     function LagrangeDual(T = BM.ProximalMethod, 
             maxiter::Int = 1000, tol::Float64 = 1e-6)
@@ -26,6 +27,7 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
         LD.bundle_method = T
         LD.maxiter = maxiter
         LD.tol = tol
+        LD.bundle_method_object = nothing
         
         return LD
     end
@@ -140,6 +142,7 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
     if parallel.is_root()
         # Create bundle method instance
         bundle = LD.bundle_method(num_all_coupling_variables, num_all_blocks, solveLagrangeDual, bundle_init)
+        LD.bundle_method_object = bundle
         BM.get_model(bundle).user_data = LD
     
         # Set optimizer to the JuMP model

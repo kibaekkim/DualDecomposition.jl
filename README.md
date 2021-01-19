@@ -1,5 +1,5 @@
 # DualDecomposition.jl
-[![Build Status](https://travis-ci.com/kibaekkim/DualDecomposition.jl.svg?branch=master)](https://travis-ci.com/kibaekkim/DualDecomposition.jl)
+![Run tests](https://github.com/kibaekkim/DualDecomposition.jl/workflows/Run%20tests/badge.svg)
 [![codecov](https://codecov.io/gh/kibaekkim/DualDecomposition.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/kibaekkim/DualDecomposition.jl)
 
 This package implements an algorithmic framework for parallel dual decomposition methods in Julia.

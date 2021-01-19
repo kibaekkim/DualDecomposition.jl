@@ -1,4 +1,5 @@
 [deps]
+BundleMethod = "e8a6717a-069f-43d5-9ac2-a49b1ec5be7b"
 CPLEX = "a076750e-1247-5638-91d2-ce28b192dca0"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DSPopt = "cdb1efd8-3f30-48e6-a1f7-a3d77bf376b8"
@@ -19,6 +20,5 @@ IJulia = "1.22.0"
 JSON = "0.21.1"
 JuMP = "0.21.5"
 MPI = "0.15.1"
-Plots = "1.8.1"
 StructJuMP = "0.2.0"
 julia = "1"

@@ -34,6 +34,8 @@ function create_decomposition_model(
         set_optimizer(m, CPLEX.Optimizer)
         set_optimizer_attribute(m, "CPX_PARAM_THREADS", 1)
         set_optimizer_attribute(m, "CPX_PARAM_SCRIND", 0)
+        set_optimizer_attribute(m, "CPX_PARAM_TILIM", 60.0)
+        set_optimizer_attribute(m, "CPX_PARAM_EPGAP", 0.01)
         return m
     end
 

@@ -132,6 +132,7 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
 
         # TODO: we may be able to add heuristic steps here.
 
+        parallel.barrier()
         comm_time = time()
 
         # Collect objvals, subgrads
@@ -294,7 +295,7 @@ end
 
 function write_subcomm_time(LD::AbstractLagrangeDual)
     if parallel.is_root()
-        open("subcomm_time_$(parallel.myid()).txt", "w") do io
+        open("subcomm_time.txt", "w") do io
             for i = 1:length(LD.subcomm_time)
                 println(io, LD.subcomm_time[i])
             end

@@ -10,6 +10,7 @@ module DualDecomposition
 using JuMP
 using BundleMethod
 using SparseArrays
+using Printf
 const BM = BundleMethod
 
 export BM

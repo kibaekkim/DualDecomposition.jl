@@ -124,6 +124,8 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
 
         # TODO: we may be able to add heuristic steps here.
 
+        comm_time = time()
+
         # Collect objvals, subgrads
         objvals_combined = parallel.combine_dict(objvals)
         objvals_vec = Vector{Float64}(undef, length(objvals_combined))
@@ -133,6 +135,10 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
             end
         end
         subgrads_combined = parallel.combine_dict(subgrads)
+
+        if parallel.is_root()
+            @printf("Subproblem sommunication time: %6.1f sec.\n", time() - comm_time)
+        end
 
         return objvals_vec, subgrads_combined
     end

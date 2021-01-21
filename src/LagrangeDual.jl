@@ -19,6 +19,7 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
     tol::Float64 # convergence tolerance
     subsolve_time::Vector{Dict{Int,Float64}}
     subcomm_time::Vector{Float64}
+    subobj_value::Vector{Float64}
 
     function LagrangeDual(T = BM.ProximalMethod, 
             maxiter::Int = 1000, tol::Float64 = 1e-6)
@@ -30,6 +31,7 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
         LD.tol = tol
         LD.subsolve_time = []
         LD.subcomm_time = []
+        LD.subobj_value = []
         
         return LD
     end
@@ -142,6 +144,7 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
             for (k,v) in objvals_combined
                 objvals_vec[k] = v
             end
+            push!(LD.subobj_value, sum(objvals_vec))
         end
         subgrads_combined = parallel.combine_dict(subgrads)
 
@@ -266,8 +269,8 @@ function get_solution!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
     LD.block_model.dual_solution = copy(BM.get_solution(method))
 end
 
-function write_subsolve_time(LD::AbstractLagrangeDual)
-    open("subsolve_time_$(parallel.myid()).txt", "w") do io
+function write_subsolve_time(LD::AbstractLagrangeDual; dir = ".")
+    open("$dir/subsolve_time_$(parallel.myid()).txt", "w") do io
         ids = keys(LD.subsolve_time[1])
         j = 1
         for id in ids
@@ -293,9 +296,9 @@ function write_subsolve_time(LD::AbstractLagrangeDual)
     end
 end
 
-function write_subcomm_time(LD::AbstractLagrangeDual)
+function write_subcomm_time(LD::AbstractLagrangeDual; dir = ".")
     if parallel.is_root()
-        open("subcomm_time.txt", "w") do io
+        open("$dir/subcomm_time.txt", "w") do io
             for i = 1:length(LD.subcomm_time)
                 println(io, LD.subcomm_time[i])
             end
@@ -303,7 +306,22 @@ function write_subcomm_time(LD::AbstractLagrangeDual)
     end
 end
 
-function write_times(LD::AbstractLagrangeDual)
-    write_subsolve_time(LD)
-    write_subcomm_time(LD)
+function write_times(LD::AbstractLagrangeDual; dir = ".")
+    write_subsolve_time(LD, dir = dir)
+    write_subcomm_time(LD, dir = dir)
+end
+
+function write_subobj_values(LD::AbstractLagrangeDual; dir = ".")
+    if parallel.is_root()
+        open("$dir/subobj_value.txt", "w") do io
+            for i = 1:length(LD.subobj_value)
+                println(io, LD.subobj_value[i])
+            end
+        end
+    end
+end
+
+function write_all(LD::AbstractLagrangeDual; dir = ".")
+    write_times(LD, dir = dir)
+    write_subobj_values(LD, dir = dir)
 end

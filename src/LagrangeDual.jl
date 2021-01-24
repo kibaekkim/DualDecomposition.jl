@@ -20,6 +20,7 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
     subsolve_time::Vector{Dict{Int,Float64}}
     subcomm_time::Vector{Float64}
     subobj_value::Vector{Float64}
+    master_time::Vector{Float64}
 
     function LagrangeDual(T = BM.ProximalMethod, 
             maxiter::Int = 1000, tol::Float64 = 1e-6)
@@ -32,6 +33,7 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
         LD.subsolve_time = []
         LD.subcomm_time = []
         LD.subobj_value = []
+        LD.master_time = []
         
         return LD
     end
@@ -179,6 +181,9 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
         # This runs the bundle method.
         BM.run!(bundle)
 
+        # Copy master solution time
+        LD.master_time = copy(bundle.model.time)
+
         # get dual objective value
         get_objective!(LD, bundle)
     
@@ -306,9 +311,20 @@ function write_subcomm_time(LD::AbstractLagrangeDual; dir = ".")
     end
 end
 
+function write_master_time(LD::AbstractLagrangeDual; dir = ".")
+    if parallel.is_root()
+        open("$dir/master_time.txt", "w") do io
+            for i = 1:length(LD.master_time)
+                println(io, LD.master_time[i])
+            end
+        end
+    end
+end
+
 function write_times(LD::AbstractLagrangeDual; dir = ".")
     write_subsolve_time(LD, dir = dir)
     write_subcomm_time(LD, dir = dir)
+    write_master_time(LD, dir = dir)
 end
 
 function write_subobj_values(LD::AbstractLagrangeDual; dir = ".")

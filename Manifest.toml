@@ -17,7 +17,7 @@ version = "0.5.0"
 
 [[BundleMethod]]
 deps = ["JuMP", "LinearAlgebra", "Printf", "SparseArrays"]
-git-tree-sha1 = "da1a87610715605480023fe0525a8a6b1d51ce5b"
+git-tree-sha1 = "32fec8e48f246515249a8e6d296a2db00fc86e57"
 repo-rev = "kimk"
 repo-url = "https://github.com/kibaekkim/BundleMethod.jl.git"
 uuid = "e8a6717a-069f-43d5-9ac2-a49b1ec5be7b"
@@ -37,9 +37,9 @@ version = "0.5.1"
 
 [[ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "89a0b14325d0f02f9caed7c8ba91181a5d254874"
+git-tree-sha1 = "53fed426c9af1eb68e63b3999e96454c2db79757"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-version = "0.9.26"
+version = "0.9.27"
 
 [[CodecBzip2]]
 deps = ["Bzip2_jll", "Libdl", "TranscodingStreams"]

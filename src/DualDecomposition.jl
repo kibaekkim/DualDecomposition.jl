@@ -8,14 +8,15 @@ include stochastic programming, temporal decomposition, and network decompositio
 module DualDecomposition
 
 using JuMP
-using BundleMethod
 using SparseArrays
 using Printf
+using BundleMethod
 const BM = BundleMethod
 
 export BM
 
 abstract type AbstractMethod end
+abstract type AbstractLagrangeDual <: AbstractMethod end
 
 """
     run!
@@ -26,6 +27,8 @@ function run! end
 
 include("parallel.jl")
 include("BlockModel.jl")
+include("LagrangeMaster/LagrangeMaster.jl")
+include("LagrangeMaster/BundleMethod.jl")
 include("LagrangeDual.jl")
 include("ScenarioTree.jl")
 

@@ -50,7 +50,7 @@ const DD = DualDecomposition
 
         @testset "Proximal Method" begin
             # Create DualDecomposition instance.
-            algo = DD.LagrangeDual(BM.ProximalMethod)
+            algo = DD.LagrangeDual()
 
             # Add Lagrange dual problem for each scenario s.
             for s in 1:NS
@@ -59,9 +59,12 @@ const DD = DualDecomposition
 
             # Set nonanticipativity variables as an array of symbols.
             DD.set_coupling_variables!(algo, coupling_variables)
+
+            # Lagrange master method
+            LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
-            DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+            DD.run!(algo, LM)
 
             @show DD.dual_objective_value(algo)
             @show DD.dual_solution(algo)
@@ -70,7 +73,7 @@ const DD = DualDecomposition
 
         @testset "Trust Region Method" begin
             # Create DualDecomposition instance.
-            algo = DD.LagrangeDual(BM.TrustRegionMethod)
+            algo = DD.LagrangeDual()
 
             # Add Lagrange dual problem for each scenario s.
             for s in 1:NS
@@ -79,9 +82,12 @@ const DD = DualDecomposition
 
             # Set nonanticipativity variables as an array of symbols.
             DD.set_coupling_variables!(algo, coupling_variables)
+
+            # Lagrange master method
+            LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
-            DD.run!(algo, GLPK.Optimizer)
+            DD.run!(algo, LM)
 
             @show DD.dual_objective_value(algo)
             @show DD.dual_solution(algo)
@@ -148,7 +154,7 @@ const DD = DualDecomposition
 
         @testset "Proximal Method" begin
             # Create DualDecomposition instance.
-            algo = DD.LagrangeDual(BM.ProximalMethod)
+            algo = DD.LagrangeDual()
 
             # Add Lagrange dual problem for each scenario s.
             for s in 1:NS
@@ -157,9 +163,12 @@ const DD = DualDecomposition
 
             # Set nonanticipativity variables as an array of symbols.
             DD.set_coupling_variables!(algo, coupling_variables)
+
+            # Lagrange master method
+            LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
-            DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+            DD.run!(algo, LM)
 
             @show DD.dual_objective_value(algo)
             @show DD.dual_solution(algo)
@@ -168,7 +177,7 @@ const DD = DualDecomposition
 
         @testset "Trust Region Method" begin
             # Create DualDecomposition instance.
-            algo = DD.LagrangeDual(BM.TrustRegionMethod)
+            algo = DD.LagrangeDual()
 
             # Add Lagrange dual problem for each scenario s.
             for s in 1:NS
@@ -177,9 +186,12 @@ const DD = DualDecomposition
 
             # Set nonanticipativity variables as an array of symbols.
             DD.set_coupling_variables!(algo, coupling_variables)
+
+            # Lagrange master method
+            LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
-            DD.run!(algo, GLPK.Optimizer)
+            DD.run!(algo, LM)
 
             @show DD.dual_objective_value(algo)
             @show DD.dual_solution(algo)
@@ -206,10 +218,13 @@ end
     
     @testset "ProximalMethod" begin
         # Create DualDecomposition instance.
-        algo = DD.LagrangeDual(BM.ProximalMethod)
+        algo = DD.LagrangeDual()
+
+        # Lagrange master method
+        LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
 
         # compute dual decomposition method
-        dual_decomp!(L, tree, algo)
+        dual_decomp!(L, tree, algo, LM)
 
         @show DD.dual_objective_value(algo)
         @show DD.dual_solution(algo)
@@ -218,10 +233,13 @@ end
 
     @testset "TrustRegionMethod" begin
         # Create DualDecomposition instance.
-        algo = DD.LagrangeDual(BM.TrustRegionMethod)
+        algo = DD.LagrangeDual()
+        
+        # Lagrange master method
+        LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
 
         # compute dual decomposition method
-        dual_decomp!(L, tree, algo)
+        dual_decomp!(L, tree, algo, LM)
 
         @show DD.dual_objective_value(algo)
         @show DD.dual_solution(algo)

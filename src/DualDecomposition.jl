@@ -31,5 +31,6 @@ include("LagrangeMaster/LagrangeMaster.jl")
 include("LagrangeMaster/BundleMethod.jl")
 include("LagrangeDual.jl")
 include("ScenarioTree.jl")
+include("utils.jl")
 
 end  # module DualDecomposition

@@ -1,7 +1,18 @@
+"""
+    BundleMaster
+
+Bundle method implementation of Lagrangian master method. 
+This simply uses BundleMethod.jl package.
+
+# Arguments
+- `constructor`: struct for bundle method
+- `optimizer`: optimization solver for bundle master
+- `inner`: bundle method object
+"""
 mutable struct BundleMaster <: AbstractLagrangeMaster
-    constructor
-    optimizer
-    inner
+    constructor::DataType
+    optimizer::Union{Nothing,DataType,MOI.OptimizerWithAttributes}
+    inner::Union{Nothing,BM.AbstractMethod}
 
     function BundleMaster(constructor, optimizer)
         bm = new()
@@ -31,16 +42,7 @@ function add_constraints!(LD::AbstractLagrangeDual, method::BundleMaster)
     end
 end
 
-function run!(method::BundleMaster)
-    BM.run!(method.inner)
-end
-
-function get_objective!(LD::AbstractLagrangeDual, method::BundleMaster)
-    LD.block_model.dual_bound = -BM.get_objective_value(method.inner)
-end
-
-function get_solution!(LD::AbstractLagrangeDual, method::BundleMaster)
-    LD.block_model.dual_solution = copy(BM.get_solution(method.inner))
-end
-
+run!(method::BundleMaster) = BM.run!(method.inner)
+get_objective(method::BundleMaster) = -BM.get_objective_value(method.inner)
+get_solution(method::BundleMaster) = copy(BM.get_solution(method.inner))
 get_times(method::BundleMaster)::Vector{Float64} = method.inner.model.time

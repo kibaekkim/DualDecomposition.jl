@@ -165,10 +165,10 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         LD.master_time = get_times(LM)
 
         # get dual objective value
-        get_objective!(LD, LM)
+        LD.block_model.dual_bound = get_objective(LM)
     
         # get dual solution
-        get_solution!(LD, LM)
+        LD.block_model.dual_solution = get_solution(LM)
 
         # broadcast we are done.
         parallel.bcast(Float64[])
@@ -231,70 +231,13 @@ objective_function(LD::AbstractLagrangeDual, block_id::Integer) = JuMP.objective
 index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableKey) = LD.var_to_index[var.block_id,var.coupling_id]
 index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableRef) = index_of_λ(LD, var.key)
 
-function write_subsolve_time(LD::AbstractLagrangeDual; dir = ".")
-    open("$dir/subsolve_time_$(parallel.myid()).txt", "w") do io
-        ids = keys(LD.subsolve_time[1])
-        j = 1
-        for id in ids
-            if j > 1
-                print(io, ",")
-            end
-            print(io, id)
-            j += 1
-        end
-        print(io, "\n")
-
-        for i = 1:length(LD.subsolve_time)
-            j = 1
-            for id in ids
-                if j > 1
-                    print(io, ",")
-                end
-                print(io, LD.subsolve_time[i][id])
-                j += 1
-            end
-            print(io, "\n")
-        end
-    end
-end
-
-function write_subcomm_time(LD::AbstractLagrangeDual; dir = ".")
-    if parallel.is_root()
-        open("$dir/subcomm_time.txt", "w") do io
-            for i = 1:length(LD.subcomm_time)
-                println(io, LD.subcomm_time[i])
-            end
-        end
-    end
-end
-
-function write_master_time(LD::AbstractLagrangeDual; dir = ".")
-    if parallel.is_root()
-        open("$dir/master_time.txt", "w") do io
-            for i = 1:length(LD.master_time)
-                println(io, LD.master_time[i])
-            end
-        end
-    end
-end
-
 function write_times(LD::AbstractLagrangeDual; dir = ".")
-    write_subsolve_time(LD, dir = dir)
-    write_subcomm_time(LD, dir = dir)
-    write_master_time(LD, dir = dir)
-end
-
-function write_subobj_values(LD::AbstractLagrangeDual; dir = ".")
-    if parallel.is_root()
-        open("$dir/subobj_value.txt", "w") do io
-            for i = 1:length(LD.subobj_value)
-                println(io, LD.subobj_value[i])
-            end
-        end
-    end
+    write_file!(LD.subsolve_time, "subsolve_time.txt", dir)
+    write_file!(LD.master_time, "subcomm_time.txt", dir)
+    write_file!(LD.master_time, "master_time.txt", dir)
 end
 
 function write_all(LD::AbstractLagrangeDual; dir = ".")
     write_times(LD, dir = dir)
-    write_subobj_values(LD, dir = dir)
+    write_file!(LD.subobj_value, "subobj_value.txt", dir)
 end

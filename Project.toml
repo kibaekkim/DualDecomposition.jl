@@ -11,6 +11,7 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
+BundleMethod = "0.3.0"
 JuMP = "0.21.5"
 MPI = "0.16"
 julia = "1"

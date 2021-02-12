@@ -147,9 +147,12 @@ function main_comp()
 
     # Create DualDecomposition instance.
     algo = DD.LagrangeDual()
+        
+    # Lagrange master method
+    LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
 
     # compute dual decomposition method
-    dual_decomp!(L, tree, algo)
+    dual_decomp!(L, tree, algo, LM)
 end
 
 

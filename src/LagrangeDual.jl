@@ -17,6 +17,10 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
     bundle_method
     maxiter::Int # maximum number of iterations
     tol::Float64 # convergence tolerance
+    subsolve_time::Vector{Dict{Int,Float64}}
+    subcomm_time::Vector{Float64}
+    subobj_value::Vector{Float64}
+    master_time::Vector{Float64}
 
     function LagrangeDual(T = BM.ProximalMethod, 
             maxiter::Int = 1000, tol::Float64 = 1e-6)
@@ -26,6 +30,10 @@ mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
         LD.bundle_method = T
         LD.maxiter = maxiter
         LD.tol = tol
+        LD.subsolve_time = []
+        LD.subcomm_time = []
+        LD.subobj_value = []
+        LD.master_time = []
         
         return LD
     end
@@ -90,6 +98,7 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
         # output
         objvals = Dict{Int,Float64}()
         subgrads = Dict{Int,SparseVector{Float64}}()
+        subsolve_time = Dict{Int,Float64}()
 
         # Adjust block objective function
         for var in coupling_variables(LD)
@@ -101,7 +110,9 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
             subgrads[id] = sparsevec(Dict{Int,Float64}(), length(λ))
 
             # Solver the Lagrange dual
+            stime = time()
             solve_sub_block!(m)
+            subsolve_time[id] = time() - stime
 
             @assert JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
 
@@ -110,6 +121,7 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
                 objvals[id] = -JuMP.objective_value(m)
             end
         end
+        push!(LD.subsolve_time, subsolve_time)
 
         # Get subgradients
         for var in coupling_variables(LD)
@@ -124,6 +136,9 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
 
         # TODO: we may be able to add heuristic steps here.
 
+        parallel.barrier()
+        comm_time = time()
+
         # Collect objvals, subgrads
         objvals_combined = parallel.combine_dict(objvals)
         objvals_vec = Vector{Float64}(undef, length(objvals_combined))
@@ -131,8 +146,14 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
             for (k,v) in objvals_combined
                 objvals_vec[k] = v
             end
+            push!(LD.subobj_value, sum(objvals_vec))
         end
         subgrads_combined = parallel.combine_dict(subgrads)
+
+        if parallel.is_root()
+            push!(LD.subcomm_time, time() - comm_time)
+            # @printf("Subproblem sommunication time: %6.1f sec.\n", time() - comm_time)
+        end
 
         return objvals_vec, subgrads_combined
     end
@@ -159,6 +180,9 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
 
         # This runs the bundle method.
         BM.run!(bundle)
+
+        # Copy master solution time
+        LD.master_time = copy(bundle.model.time)
 
         # get dual objective value
         get_objective!(LD, bundle)
@@ -248,4 +272,72 @@ end
 
 function get_solution!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
     LD.block_model.dual_solution = copy(BM.get_solution(method))
+end
+
+function write_subsolve_time(LD::AbstractLagrangeDual; dir = ".")
+    open("$dir/subsolve_time_$(parallel.myid()).txt", "w") do io
+        ids = keys(LD.subsolve_time[1])
+        j = 1
+        for id in ids
+            if j > 1
+                print(io, ",")
+            end
+            print(io, id)
+            j += 1
+        end
+        print(io, "\n")
+
+        for i = 1:length(LD.subsolve_time)
+            j = 1
+            for id in ids
+                if j > 1
+                    print(io, ",")
+                end
+                print(io, LD.subsolve_time[i][id])
+                j += 1
+            end
+            print(io, "\n")
+        end
+    end
+end
+
+function write_subcomm_time(LD::AbstractLagrangeDual; dir = ".")
+    if parallel.is_root()
+        open("$dir/subcomm_time.txt", "w") do io
+            for i = 1:length(LD.subcomm_time)
+                println(io, LD.subcomm_time[i])
+            end
+        end
+    end
+end
+
+function write_master_time(LD::AbstractLagrangeDual; dir = ".")
+    if parallel.is_root()
+        open("$dir/master_time.txt", "w") do io
+            for i = 1:length(LD.master_time)
+                println(io, LD.master_time[i])
+            end
+        end
+    end
+end
+
+function write_times(LD::AbstractLagrangeDual; dir = ".")
+    write_subsolve_time(LD, dir = dir)
+    write_subcomm_time(LD, dir = dir)
+    write_master_time(LD, dir = dir)
+end
+
+function write_subobj_values(LD::AbstractLagrangeDual; dir = ".")
+    if parallel.is_root()
+        open("$dir/subobj_value.txt", "w") do io
+            for i = 1:length(LD.subobj_value)
+                println(io, LD.subobj_value[i])
+            end
+        end
+    end
+end
+
+function write_all(LD::AbstractLagrangeDual; dir = ".")
+    write_times(LD, dir = dir)
+    write_subobj_values(LD, dir = dir)
 end

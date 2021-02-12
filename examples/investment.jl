@@ -149,11 +149,11 @@ function main_comp()
     algo = DD.LagrangeDual(BM.TrustRegionMethod)
 
     # compute dual decomposition method
-    dual_decomp!(L, tree, algo)
+    dual_decomp!(L, tree, algo, GLPK.Optimizer)
 end
 
 
-function dual_decomp!(L::Int, tree::DD.Tree, algo::DD.LagrangeDual)
+function dual_decomp!(L::Int, tree::DD.Tree, algo::DD.LagrangeDual, optimizer)
 
     # Add Lagrange dual problem for each scenario s.
     nodelist = DD.get_stage_id(tree)
@@ -193,6 +193,6 @@ function dual_decomp!(L::Int, tree::DD.Tree, algo::DD.LagrangeDual)
     DD.set_coupling_variables!(algo, coupling_variables)
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+    DD.run!(algo, optimizer)
 end
 

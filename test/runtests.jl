@@ -209,7 +209,7 @@ end
         algo = DD.LagrangeDual(BM.ProximalMethod)
 
         # compute dual decomposition method
-        dual_decomp!(L, tree, algo)
+        dual_decomp!(L, tree, algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
 
         @show DD.dual_objective_value(algo)
         @show DD.dual_solution(algo)
@@ -221,7 +221,7 @@ end
         algo = DD.LagrangeDual(BM.TrustRegionMethod)
 
         # compute dual decomposition method
-        dual_decomp!(L, tree, algo)
+        dual_decomp!(L, tree, algo, GLPK.Optimizer)
 
         @show DD.dual_objective_value(algo)
         @show DD.dual_solution(algo)

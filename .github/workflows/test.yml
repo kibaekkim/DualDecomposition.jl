@@ -6,7 +6,6 @@ on:
     - master
     paths-ignore:
     - 'README.md'
-    - 'Project.toml'
     - 'Manifest.toml'
   pull_request:
     branches:

@@ -164,8 +164,13 @@ const DD = DualDecomposition
             # Set nonanticipativity variables as an array of symbols.
             DD.set_coupling_variables!(algo, coupling_variables)
 
+            # Change parameters
+            params = BM.Parameters()
+            BM.set_parameter(params, "ϵ_s", 1.e-4)
+            @test BM.get_parameter(params, "ϵ_s") == 1.e-4
+
             # Lagrange master method
-            LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+            LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
             DD.run!(algo, LM)

@@ -13,18 +13,20 @@ mutable struct BundleMaster <: AbstractLagrangeMaster
     constructor::DataType
     optimizer::Union{Nothing,DataType,MOI.OptimizerWithAttributes}
     inner::Union{Nothing,BM.AbstractMethod}
+    params::BM.Parameters
 
-    function BundleMaster(constructor, optimizer)
+    function BundleMaster(constructor, optimizer, params = BM.Parameters())
         bm = new()
         bm.constructor = constructor
         bm.optimizer = optimizer
         bm.inner = nothing
+        bm.params = params
         return bm
     end
 end
 
 function load!(method::BundleMaster, num_coupling_variables::Int, num_blocks::Int, eval_function::Function, init_sol::Vector{Float64})
-    method.inner = method.constructor(num_coupling_variables, num_blocks, eval_function, init_sol)
+    method.inner = method.constructor(num_coupling_variables, num_blocks, eval_function; init = init_sol, params = method.params)
 
     # Set optimizer to bundle method
     model = BM.get_jump_model(method.inner)

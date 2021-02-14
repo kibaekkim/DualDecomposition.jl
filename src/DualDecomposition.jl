@@ -10,6 +10,7 @@ module DualDecomposition
 using JuMP
 using SparseArrays
 using Printf
+using LinearAlgebra
 using BundleMethod
 const BM = BundleMethod
 
@@ -29,6 +30,7 @@ include("parallel.jl")
 include("BlockModel.jl")
 include("LagrangeMaster/LagrangeMaster.jl")
 include("LagrangeMaster/BundleMethod.jl")
+include("LagrangeMaster/SubgradientMethod.jl")
 include("LagrangeDual.jl")
 include("ScenarioTree.jl")
 include("utils.jl")

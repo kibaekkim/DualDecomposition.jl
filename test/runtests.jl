@@ -48,6 +48,29 @@ const DD = DualDecomposition
             end
         end
 
+        @testset "Subgradient Method" begin
+            # Create DualDecomposition instance.
+            algo = DD.LagrangeDual()
+
+            # Add Lagrange dual problem for each scenario s.
+            for s in 1:NS
+                DD.add_block_model!(algo, s, models[s])
+            end
+
+            # Set nonanticipativity variables as an array of symbols.
+            DD.set_coupling_variables!(algo, coupling_variables)
+
+            # Lagrange master method
+            LM = DD.SubgradientMaster(1000)
+            
+            # Solve the problem with the solver; this solver is for the underlying bundle method.
+            DD.run!(algo, LM)
+
+            @show DD.dual_objective_value(algo)
+            @show DD.dual_solution(algo)
+            @test isapprox(DD.dual_objective_value(algo), -108390, rtol=1e-3)
+        end
+
         @testset "Proximal Method" begin
             # Create DualDecomposition instance.
             algo = DD.LagrangeDual()

@@ -7,27 +7,38 @@ mutable struct SubgradientMaster <: AbstractLagrangeMaster
     num_vars::Int
     num_functions::Int
     eval_f::Union{Nothing,Function}
+
+    iter::Int # current iteration count
     maxiter::Int
 
     f::Float64
+    best_f::Float64
     x::Vector{Float64}
     best_x::Vector{Float64}
+    ∇f::Vector{Float64}
     α::Float64 # step size
+
+    step_size::Function
 
     constraint_matrix::Union{Nothing,SparseMatrixCSC{Float64,Int}}
 
     iteration_time::Vector{Float64}
 
-    function SubgradientMaster(maxiter::Int = 1000)
+    function SubgradientMaster()
         sg = new()
         sg.num_vars = 0
         sg.num_functions = 0
         sg.eval_f = nothing
-        sg.maxiter = maxiter
+        sg.iter = 0
+        sg.maxiter = 1000
         sg.f = -Inf
+        sg.best_f = -Inf
         sg.x = []
         sg.best_x = []
+        sg.∇f = []
         sg.α = 0.1
+        # sg.step_size = (method) -> method.α / method.iter # square summable but not summable
+        sg.step_size = (method) -> method.α / sqrt(method.iter) # Nonsummable diminishing
         sg.constraint_matrix = nothing
         sg.iteration_time = []
         return sg
@@ -68,10 +79,11 @@ function run!(method::SubgradientMaster)
     total_master_time = 0.0
     total_stime = time()
 
-    grad = zeros(method.num_vars)
+    method.∇f = zeros(method.num_vars)
 
-    for i in 1:method.maxiter
-        if i % 100 == 1
+    while method.iter < method.maxiter
+        method.iter += 1
+        if method.iter % 100 == 1
             @printf("%6s", "Iter")
             @printf("\t%13s", "fbest")
             @printf("\t%13s", "f")
@@ -83,24 +95,22 @@ function run!(method::SubgradientMaster)
             @printf("\n")
         end
         f, g = method.eval_f(method.x)
-        fsum = sum(f)
-        if method.f < -fsum
-            method.f = -fsum
+        method.f = -sum(f)
+        if method.best_f < method.f
+            method.best_f = method.f
             copy!(method.best_x, method.x)
         end
 
         master_stime = time()
 
-        fill!(grad, 0.0)
+        fill!(method.∇f, 0.0)
         for (k, gk) in g
-            grad .+= gk
+            method.∇f .+= gk
         end
 
         # update
-        # α = method.α / i # square summable but not summable
-        α = method.α / sqrt(i) # Nonsummable diminishing
-        # α = (abs(108390 - fsum) / norm(grad)^2) # Polyak's
-        method.x .-= α * grad
+        α = method.step_size(method)
+        method.x .-= α * method.∇f
 
         # projection
         method.x .-= proj * method.x
@@ -111,10 +121,10 @@ function run!(method::SubgradientMaster)
         total_master_time += time() - master_stime
         total_time = time() - total_stime
 
-        @printf("%6d", i)
+        @printf("%6d", method.iter)
+        @printf("\t%+6e", method.best_f)
         @printf("\t%+6e", method.f)
-        @printf("\t%+6e", -fsum)
-        @printf("\t%+6e", norm(grad))
+        @printf("\t%+6e", norm(method.∇f))
         @printf("\t%+6e", α)
         # @printf("\t%+6e", norm(res))
         @printf("\t%7.2f", total_master_time)
@@ -123,6 +133,6 @@ function run!(method::SubgradientMaster)
     end
 end
 
-get_objective(method::SubgradientMaster) = method.f
+get_objective(method::SubgradientMaster) = method.best_f
 get_solution(method::SubgradientMaster) = method.best_x
 get_times(method::SubgradientMaster)::Vector{Float64} = method.iteration_time

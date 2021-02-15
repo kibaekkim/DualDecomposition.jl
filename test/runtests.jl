@@ -2,6 +2,7 @@ using Test
 using DualDecomposition
 using JuMP, Ipopt, GLPK
 using MPI
+using LinearAlgebra
 
 const DD = DualDecomposition
 
@@ -61,7 +62,9 @@ const DD = DualDecomposition
             DD.set_coupling_variables!(algo, coupling_variables)
 
             # Lagrange master method
-            LM = DD.SubgradientMaster(1000)
+            LM = DD.SubgradientMaster()
+            LM.maxiter = 1000
+            LM.step_size = (method) -> (abs(-108390 - method.f) / norm(method.∇f)^2) # Polyak's
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
             DD.run!(algo, LM)

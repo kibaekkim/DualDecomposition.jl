@@ -11,19 +11,15 @@ Lagrangian dual method for dual decomposition. This `mutable struct` constains:
 mutable struct LagrangeDual <: AbstractLagrangeDual
     block_model::BlockModel
     var_to_index::Dict{Tuple{Int,Any},Int} # maps coupling variable to the index wrt the master problem
-    maxiter::Int # maximum number of iterations
-    tol::Float64 # convergence tolerance
     subsolve_time::Vector{Dict{Int,Float64}}
     subcomm_time::Vector{Float64}
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
 
-    function LagrangeDual(maxiter::Int = 1000, tol::Float64 = 1e-6)
+    function LagrangeDual()
         LD = new()
         LD.block_model = BlockModel()
         LD.var_to_index = Dict()
-        LD.maxiter = maxiter
-        LD.tol = tol
         LD.subsolve_time = []
         LD.subcomm_time = []
         LD.subobj_value = []

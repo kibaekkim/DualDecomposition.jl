@@ -69,11 +69,17 @@ function deserialize!(serialized, counts::Vector{Cint}, x::Vector{T}) where {T}
     end
 end
 
+function barrier()
+    if nprocs() > 1
+        MPI.Barrier(MPI.COMM_WORLD)
+    end
+end
+
 function allcollect(x::Vector{T}) where {T}
     if nprocs() > 1
         x_serialized = MPI.serialize(x)
-        counts::Vector{Cint} = MPI.Allgatherv([length(x_serialized)], ones(Cint, nprocs()), MPI.COMM_WORLD)
-        collect_serialized = MPI.Allgatherv(x_serialized, counts, MPI.COMM_WORLD)
+        counts::Vector{Cint} = MPI.Allgather!([length(x_serialized)], UBuffer(similar([1], nprocs()), 1), MPI.COMM_WORLD)
+        collect_serialized = MPI.Allgatherv!(x_serialized, VBuffer(similar(x_serialized, Base.sum(counts)), counts), MPI.COMM_WORLD)
         x = Vector{T}()
         deserialize!(collect_serialized, counts, x)
     end
@@ -83,11 +89,13 @@ end
 function collect(x::Vector{T}) where {T}
     if nprocs() > 1
         x_serialized = MPI.serialize(x)
-        counts::Vector{Cint} = MPI.Allgatherv([length(x_serialized)], ones(Cint, nprocs()), MPI.COMM_WORLD)
-        collect_serialized = MPI.Gatherv(x_serialized, counts, 0, MPI.COMM_WORLD)
+        counts::Vector{Cint} = MPI.Allgather!([length(x_serialized)], UBuffer(similar([1], nprocs()), 1), MPI.COMM_WORLD)
         if is_root()
+            x_serialized = MPI.Gatherv!(x_serialized, VBuffer(similar(x_serialized, Base.sum(counts)), counts), 0, MPI.COMM_WORLD)
             x = Vector{T}()
-            deserialize!(collect_serialized, counts, x)
+            deserialize!(x_serialized, counts, x)
+        else
+            MPI.Gatherv!(x_serialized, nothing, 0, MPI.COMM_WORLD)
         end
     end
     return x
@@ -101,13 +109,16 @@ function combine_dict(x::Dict{Int,Float64})
             push!(ks,k)
             push!(vs,v)
         end
-        counts::Vector{Cint} = MPI.Allgatherv([length(ks)], ones(Cint, nprocs()), MPI.COMM_WORLD)
-        ks_collected = MPI.Gatherv(ks, counts, 0, MPI.COMM_WORLD)
-        vs_collected = MPI.Gatherv(vs, counts, 0, MPI.COMM_WORLD)
-        if myid() == 0
+        counts::Vector{Cint} = MPI.Allgather!([length(ks)], UBuffer(similar([1], nprocs()), 1), MPI.COMM_WORLD)
+        if is_root()
+            ks_collected = MPI.Gatherv!(ks, VBuffer(similar(ks, Base.sum(counts)), counts), 0, MPI.COMM_WORLD)
+            vs_collected = MPI.Gatherv!(vs, VBuffer(similar(vs, Base.sum(counts)), counts), 0, MPI.COMM_WORLD)
             for i in 1:length(ks_collected)
                 x[ks_collected[i]] = vs_collected[i]
             end
+        else
+            MPI.Gatherv!(ks, nothing, 0, MPI.COMM_WORLD)
+            MPI.Gatherv!(vs, nothing, 0, MPI.COMM_WORLD)
         end
     end
     return x
@@ -121,14 +132,16 @@ function combine_dict(x::Dict{Int,SparseVector{Float64}})
             push!(ks,k)
             push!(vs,v)
         end
-        counts::Vector{Cint} = MPI.Allgatherv([length(ks)], ones(Cint, nprocs()), MPI.COMM_WORLD)
-        ks_collected = MPI.Gatherv(ks, counts, 0, MPI.COMM_WORLD)
+        counts::Vector{Cint} = MPI.Allgather!([length(ks)], UBuffer(similar([1], nprocs()), 1), MPI.COMM_WORLD)
         vs_collected = collect(vs)
         if is_root()
             @assert length(vs_collected) == Base.sum(counts)
+            ks_collected = MPI.Gatherv!(ks, VBuffer(similar(ks, Base.sum(counts)), counts), 0, MPI.COMM_WORLD)
             for i in 1:length(ks_collected)
                 x[ks_collected[i]] = vs_collected[i]
             end
+        else
+            MPI.Gatherv!(ks, nothing, 0, MPI.COMM_WORLD)
         end
     end
     return x

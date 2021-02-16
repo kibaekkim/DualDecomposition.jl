@@ -1,6 +1,3 @@
-
-abstract type AbstractLagrangeDual <: AbstractMethod end
-
 """
     LagrangeDual
 
@@ -11,25 +8,18 @@ Lagrangian dual method for dual decomposition. This `mutable struct` constains:
     - `tol::Float64` sets the relative tolerance for termination
 """
 
-mutable struct LagrangeDual{T<:BM.AbstractMethod} <: AbstractLagrangeDual
+mutable struct LagrangeDual <: AbstractLagrangeDual
     block_model::BlockModel
     var_to_index::Dict{Tuple{Int,Any},Int} # maps coupling variable to the index wrt the master problem
-    bundle_method
-    maxiter::Int # maximum number of iterations
-    tol::Float64 # convergence tolerance
     subsolve_time::Vector{Dict{Int,Float64}}
     subcomm_time::Vector{Float64}
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
 
-    function LagrangeDual(T = BM.ProximalMethod, 
-            maxiter::Int = 1000, tol::Float64 = 1e-6)
-        LD = new{T}()
+    function LagrangeDual()
+        LD = new()
         LD.block_model = BlockModel()
         LD.var_to_index = Dict()
-        LD.bundle_method = T
-        LD.maxiter = maxiter
-        LD.tol = tol
         LD.subsolve_time = []
         LD.subcomm_time = []
         LD.subobj_value = []
@@ -63,23 +53,23 @@ end
 dual_objective_value(LD::AbstractLagrangeDual) = dual_objective_value(LD.block_model)
 dual_solution(LD::AbstractLagrangeDual) = dual_solution(LD.block_model)
 
-"""
-    run!(LD::AbstractLagrangeDual, optimizer)
 
-This runs the Lagrangian dual method for solving the block model. `optimizer`
-specifies the optimization solver used for `BundleMethod` package.
 """
-function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Array{Float64}} = nothing)
+    run!
+
+This runs the Lagrangian dual method for solving the block model.
+"""
+function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ = nothing)
 
     # We assume that the block models are distributed.
     num_all_blocks = parallel.sum(num_blocks(LD))
     num_all_coupling_variables = parallel.sum(num_coupling_variables(LD))
 
-    # initialize bundle_init if it is nothing
-    if isnothing(bundle_init)
-        bundle_init = zeros(num_all_coupling_variables)
+    # initialize λ if it is nothing
+    if isnothing(initial_λ)
+        initial_λ = zeros(num_all_coupling_variables)
     end
-    @assert length(bundle_init) == num_all_coupling_variables
+    @assert length(initial_λ) == num_all_coupling_variables
 
     # check the validity of LagrangeDual
     if num_all_blocks <= 0 || num_all_coupling_variables == 0
@@ -159,36 +149,22 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
     end
 
     if parallel.is_root()
-        # Create bundle method instance
-        bundle = LD.bundle_method(num_all_coupling_variables, num_all_blocks, solveLagrangeDual, bundle_init)
-        BM.get_model(bundle).user_data = LD
-    
-        # Set optimizer to the JuMP model
-        model = BM.get_jump_model(bundle)
-        JuMP.set_optimizer(model, optimizer)
-    
-        # parameters for BundleMethod
-        # bundle.M_g = max(500, dv.nvars + nmodels + 1)
-        bundle.maxiter = LD.maxiter
-        BM.set_bundle_tolerance!(bundle, LD.tol)
-    
-        # This builds the bunlde model.
-        BM.build_bundle_model!(bundle)
+        load!(LM, num_all_coupling_variables, num_all_blocks, solveLagrangeDual, initial_λ)
     
         # Add bounding constraints to the Lagrangian master
-        add_constraints!(LD, bundle)
+        add_constraints!(LD, LM)
 
         # This runs the bundle method.
-        BM.run!(bundle)
+        run!(LM)
 
         # Copy master solution time
-        LD.master_time = copy(bundle.model.time)
+        LD.master_time = get_times(LM)
 
         # get dual objective value
-        get_objective!(LD, bundle)
+        LD.block_model.dual_bound = get_objective(LM)
     
         # get dual solution
-        get_solution!(LD, bundle)
+        LD.block_model.dual_solution = get_solution(LM)
 
         # broadcast we are done.
         parallel.bcast(Float64[])
@@ -198,17 +174,6 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
             solveLagrangeDual(λ)
             λ = parallel.bcast(nothing)
         end
-    end
-end
-
-"""
-This adds the bounding constraints to the Lagrangian master problem.
-"""
-function add_constraints!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
-    model = BM.get_jump_model(method)
-    λ = model[:x]
-    for (id, vars) in LD.block_model.variables_by_couple
-        @constraint(model, sum(λ[index_of_λ(LD, v)] for v in vars) == 0)
     end
 end
 
@@ -262,82 +227,13 @@ objective_function(LD::AbstractLagrangeDual, block_id::Integer) = JuMP.objective
 index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableKey) = LD.var_to_index[var.block_id,var.coupling_id]
 index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableRef) = index_of_λ(LD, var.key)
 
-
-"""
-These get dual objective and solutions
-"""
-function get_objective!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
-    LD.block_model.dual_bound = -BM.get_objective_value(method)
-end
-
-function get_solution!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
-    LD.block_model.dual_solution = copy(BM.get_solution(method))
-end
-
-function write_subsolve_time(LD::AbstractLagrangeDual; dir = ".")
-    open("$dir/subsolve_time_$(parallel.myid()).txt", "w") do io
-        ids = keys(LD.subsolve_time[1])
-        j = 1
-        for id in ids
-            if j > 1
-                print(io, ",")
-            end
-            print(io, id)
-            j += 1
-        end
-        print(io, "\n")
-
-        for i = 1:length(LD.subsolve_time)
-            j = 1
-            for id in ids
-                if j > 1
-                    print(io, ",")
-                end
-                print(io, LD.subsolve_time[i][id])
-                j += 1
-            end
-            print(io, "\n")
-        end
-    end
-end
-
-function write_subcomm_time(LD::AbstractLagrangeDual; dir = ".")
-    if parallel.is_root()
-        open("$dir/subcomm_time.txt", "w") do io
-            for i = 1:length(LD.subcomm_time)
-                println(io, LD.subcomm_time[i])
-            end
-        end
-    end
-end
-
-function write_master_time(LD::AbstractLagrangeDual; dir = ".")
-    if parallel.is_root()
-        open("$dir/master_time.txt", "w") do io
-            for i = 1:length(LD.master_time)
-                println(io, LD.master_time[i])
-            end
-        end
-    end
-end
-
 function write_times(LD::AbstractLagrangeDual; dir = ".")
-    write_subsolve_time(LD, dir = dir)
-    write_subcomm_time(LD, dir = dir)
-    write_master_time(LD, dir = dir)
-end
-
-function write_subobj_values(LD::AbstractLagrangeDual; dir = ".")
-    if parallel.is_root()
-        open("$dir/subobj_value.txt", "w") do io
-            for i = 1:length(LD.subobj_value)
-                println(io, LD.subobj_value[i])
-            end
-        end
-    end
+    write_file!(LD.subsolve_time, "subsolve_time.txt", dir)
+    write_file!(LD.master_time, "subcomm_time.txt", dir)
+    write_file!(LD.master_time, "master_time.txt", dir)
 end
 
 function write_all(LD::AbstractLagrangeDual; dir = ".")
     write_times(LD, dir = dir)
-    write_subobj_values(LD, dir = dir)
+    write_file!(LD.subobj_value, "subobj_value.txt", dir)
 end

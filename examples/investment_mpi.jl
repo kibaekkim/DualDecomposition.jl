@@ -192,3 +192,6 @@ function dual_decomp!(L::Int, tree::DD.Tree, algo::DD.LagrangeDual)
     # Solve the problem with the solver; this solver is for the underlying bundle method.
     DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
 end
+
+
+main_comp()

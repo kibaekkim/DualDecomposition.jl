@@ -61,7 +61,7 @@ dual_solution(LD::AbstractLagrangeDual) = dual_solution(LD.block_model)
 This runs the Lagrangian dual method for solving the block model. `optimizer`
 specifies the optimization solver used for `BundleMethod` package.
 """
-function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Array{Float64}} = nothing, termination_val::Float64 = nothing)
+function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Array{Float64}} = nothing, termination_val::Union{Float64,Nothing} = nothing)
 
     # We assume that the block models are distributed.
     num_all_blocks = parallel.sum(num_blocks(LD))

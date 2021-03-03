@@ -23,7 +23,7 @@ This package can be installed by cloning this repository:
 
 Please see examples in `./examples`.
 
-## Citing the package
+## Citing this package
 
 ```
 @misc{DualDecomposition.jl.0.2.1,

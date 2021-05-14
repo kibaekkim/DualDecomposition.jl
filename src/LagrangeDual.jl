@@ -96,6 +96,8 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
             adjust_objective_function!(LD, var, λ[index_of_λ(LD, var)])
         end
 
+        #I did not understand the parallel implementation here.
+        # it looks like at each process, all the blocks are solved ?
         for (id,m) in block_model(LD)
             # Initialize subgradients
             subgrads[id] = sparsevec(Dict{Int,Float64}(), length(λ))
@@ -107,7 +109,8 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
 
             # We may want consider other statuses.
             if JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
-                objvals[id] = -JuMP.objective_value(m)
+                # objvals[id] = -JuMP.objective_value(m)
+                objvals[id] = -JuMP.objective_bound(m)
             end
         end
 
@@ -123,6 +126,7 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
         end
 
         # TODO: we may be able to add heuristic steps here.
+        all_blocks!(LD)
 
         # Collect objvals, subgrads
         objvals_combined = parallel.combine_dict(objvals)
@@ -162,6 +166,7 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
 
         # get dual objective value
         get_objective!(LD, bundle)
+
     
         # get dual solution
         get_solution!(LD, bundle)
@@ -249,3 +254,150 @@ end
 function get_solution!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
     LD.block_model.dual_solution = copy(BM.get_solution(method))
 end
+
+"""
+rounding heuristic 
+"""
+
+
+function rounding_heuristic!(LD::AbstractLagrangeDual)
+    #set weights if not exits
+    if LD.block_model.model.count != LD.block_model.weights.count
+        LD.block_model.weights = Dict(block_id => 1/length(LD.block_model.model) for (block_id, model) in LD.block_model.model)
+    end
+    coupling_variables_mean = Dict()
+    coupling_variables_lb = Dict()
+    coupling_variables_ub = Dict()
+    for variables in LD.block_model.coupling_variables
+        coupling_variables_mean[variables.key.coupling_id] = haskey(coupling_variables_mean, variables.key.coupling_id) ? coupling_variables_mean[variables.key.coupling_id] + JuMP.value(variables.ref) * LD.block_model.weights[variables.key.block_id] : JuMP.value(variables.ref) * LD.block_model.weights[variables.key.block_id]
+        if JuMP.has_lower_bound(variables.ref)
+            coupling_variables_lb[variables.ref] = JuMP.lower_bound(variables.ref)
+        end 
+        if JuMP.has_upper_bound(variables.ref)
+            coupling_variables_ub[variables.ref] = JuMP.upper_bound(variables.ref)
+        end 
+    end 
+    
+    new_primal_solution = Dict()
+    for variables in LD.block_model.coupling_variables
+        if JuMP.is_integer(variables.ref) || JuMP.is_binary(variables.ref)
+            JuMP.fix(variables.ref, ceil(coupling_variables_mean[variables.key.coupling_id]), force=true)
+            new_primal_solution[variables.key.coupling_id] = ceil(coupling_variables_mean[variables.key.coupling_id])
+        else
+            JuMP.fix(variables.ref, coupling_variables_mean[variables.key.coupling_id], force=true)
+            new_primal_solution[variables.key.coupling_id] = coupling_variables_mean[variables.key.coupling_id]
+        end
+    end 
+
+    if !haskey(LD.block_model.record, "primal_solution")
+        LD.block_model.record["primal_solution"] = Dict()
+    end 
+    LD.block_model.record["primal_solution"][length(LD.block_model.record["primal_solution"])+1] = new_primal_solution
+
+
+    cur_primal_bound = 0.0
+    for (id,m) in block_model(LD)
+        solve_sub_block!(m)
+
+        if ! (JuMP.termination_status(m)  in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED])
+            cur_primal_bound = + Inf 
+            break 
+        else
+            cur_primal_bound += JuMP.objective_value(m)
+        end 
+    end   
+    println("the current primal bound is ", cur_primal_bound)    
+    if cur_primal_bound < LD.block_model.primal_bound
+        LD.block_model.primal_bound = cur_primal_bound
+        LD.block_model.primal_solution = copy(new_primal_solution)
+    end 
+
+    # unfix variables
+    for variables in LD.block_model.coupling_variables
+        JuMP.unfix(variables.ref)
+    end    
+    #recover bound 
+    for (var, lb) in coupling_variables_lb
+        JuMP.set_lower_bound(var, lb)
+    end
+
+    for (var, ub) in coupling_variables_ub
+        JuMP.set_upper_bound(var, ub)
+    end   
+end
+
+
+function all_blocks!(LD::AbstractLagrangeDual)
+    #set weights if not exits
+    if LD.block_model.model.count != LD.block_model.weights.count
+        LD.block_model.weights = Dict(block_id => 1/length(LD.block_model.model) for (block_id, model) in LD.block_model.model)
+    end
+    coupling_variables_mean = Dict()
+    coupling_variables_lb = Dict()
+    coupling_variables_ub = Dict()
+    for variables in LD.block_model.coupling_variables
+        coupling_variables_mean[variables.key.coupling_id] = haskey(coupling_variables_mean, variables.key.coupling_id) ? coupling_variables_mean[variables.key.coupling_id] + JuMP.value(variables.ref) * LD.block_model.weights[variables.key.block_id] : JuMP.value(variables.ref) * LD.block_model.weights[variables.key.block_id]
+        if JuMP.has_lower_bound(variables.ref)
+            coupling_variables_lb[variables.ref] = JuMP.lower_bound(variables.ref)
+        end 
+        if JuMP.has_upper_bound(variables.ref)
+            coupling_variables_ub[variables.ref] = JuMP.upper_bound(variables.ref)
+        end 
+    end 
+        
+    #try all the blocks  
+    for b_rand in 1:num_blocks(LD)
+        new_primal_solution = Dict()
+        for variables in LD.block_model.coupling_variables
+            if variables.key.block_id == b_rand
+                new_primal_solution[variables.key.coupling_id] = JuMP.value(variables.ref)
+            end 
+        end 
+        
+        
+        for variables in LD.block_model.coupling_variables
+            JuMP.fix(variables.ref, new_primal_solution[variables.key.coupling_id], force=true) 
+        end 
+
+        if !haskey(LD.block_model.record, "primal_solution")
+            LD.block_model.record["primal_solution"] = Dict()
+        end 
+        LD.block_model.record["primal_solution"][length(LD.block_model.record["primal_solution"])+1] = new_primal_solution
+
+
+        cur_primal_bound = 0.0
+        for (id,m) in block_model(LD)
+            solve_sub_block!(m)
+
+            if ! (JuMP.termination_status(m)  in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED])
+                cur_primal_bound = + Inf 
+                break 
+            else
+                cur_primal_bound += JuMP.objective_value(m)
+            end 
+        end   
+       
+        if cur_primal_bound < LD.block_model.primal_bound
+            LD.block_model.primal_bound = cur_primal_bound
+            LD.block_model.primal_solution = copy(new_primal_solution)
+        end 
+    end 
+
+    println("the current primal bound is ", LD.block_model.primal_bound)
+
+    #unfix variables
+    for variables in LD.block_model.coupling_variables
+        JuMP.unfix(variables.ref)
+    end    
+    #recover bound 
+    for (var, lb) in coupling_variables_lb
+        JuMP.set_lower_bound(var, lb)
+    end
+
+    for (var, ub) in coupling_variables_ub
+        JuMP.set_upper_bound(var, ub)
+    end   
+end
+
+
+

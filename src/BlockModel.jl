@@ -42,8 +42,10 @@ mutable struct BlockModel <: AbstractBlockModel
     dual_solution::Vector{Float64}
 
     # TODO: These may be available with heuristics.
-    # primal_bound::Float64
-    # primal_solution::Vector{Float64}
+    primal_bound::Float64
+    primal_solution::Dict{Int, Float64} #coupling_id : value 
+    weights::Dict{Int, Float64} # block_id : value 
+    record::Dict{Any, Any}
 
     function BlockModel()
         return new(
@@ -51,7 +53,11 @@ mutable struct BlockModel <: AbstractBlockModel
             [],
             Dict(),
             0.0,
-            [])
+            [],
+            +Inf,
+            Dict(),
+            Dict(),
+            Dict())
     end
 end
 
@@ -125,6 +131,14 @@ function set_variables_by_couple!(block_model::AbstractBlockModel, variables::Ve
     for v in variables
         push!(block_model.variables_by_couple[v.coupling_id], v)
     end
+end
+
+"""
+    set_block_weights!
+    set the weights of the blocks that will be used by the primal heuristics
+"""
+function set_block_weights!(block_model::AbstractBlockModel, weights::Dict{Int, Float64})
+    block_model.weights = weights
 end
 
 """

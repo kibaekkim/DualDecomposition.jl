@@ -96,8 +96,6 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
             adjust_objective_function!(LD, var, λ[index_of_λ(LD, var)])
         end
 
-        #I did not understand the parallel implementation here.
-        # it looks like at each process, all the blocks are solved ?
         for (id,m) in block_model(LD)
             # Initialize subgradients
             subgrads[id] = sparsevec(Dict{Int,Float64}(), length(λ))
@@ -113,6 +111,9 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
                 objvals[id] = -JuMP.objective_bound(m)
             end
         end
+        if parallel.is_root()
+            @show subgrads
+        end 
 
         # Get subgradients
         for var in coupling_variables(LD)
@@ -120,13 +121,44 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
             subgrads[var.key.block_id][index_of_λ(LD, var)] = -JuMP.value(var.ref)
         end
 
+        if parallel.is_root()
+            @show subgrads
+        end 
+        
         # Reset objective coefficients
         for var in coupling_variables(LD)
             reset_objective_function!(LD, var, λ[index_of_λ(LD, var)])
         end
 
         # TODO: we may be able to add heuristic steps here.
-        all_blocks!(LD)
+        #get the values of all coupling variables
+        # opt_coupling_val = Dict{Int,SparseVector{Float64}}()
+        # coupling_ub = Dict{Int,SparseVector{Float64}}()
+        # coupling_lb = Dict{Int,SparseVector{Float64}}()
+        # for (id,m) in block_model(LD)
+        #     opt_coupling_val[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+        #     coupling_ub[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+        #     coupling_lb[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+        # end
+        # #get variable values and bounds
+        # for var in coupling_variables(LD)
+        #     # @assert has_block_model(LD, var.key.block_id)
+        #     opt_coupling_val[var.key.block_id][index_of_λ(LD, var)] = JuMP.value(var.ref)
+        #     if JuMP.has_lower_bound(var.ref)
+        #         coupling_lb[var.key.block_id][index_of_λ(LD, var)] = JuMP.lower_bound(var.ref)
+        #     end 
+        #     if JuMP.has_upper_bound(var.ref)
+        #         coupling_ub[var.key.block_id][index_of_λ(LD, var)] = JuMP.upper_bound(var.ref)
+        #     end 
+        # end  
+        # @show opt_coupling_val
+
+        # opt_coupling_val_combined = parallel.combine_dict(opt_coupling_val)
+        # coupling_ub_combined = parallel.combine_dict(coupling_ub)
+        # coupling_lb_combined = parallel.combine_dict(coupling_lb)      
+
+        # @show opt_coupling_val_combined
+        # all_blocks!(LD)
 
         # Collect objvals, subgrads
         objvals_combined = parallel.combine_dict(objvals)
@@ -136,7 +168,15 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
                 objvals_vec[k] = v
             end
         end
+
+        if parallel.is_root()
+            @show subgrads
+        end 
+
         subgrads_combined = parallel.combine_dict(subgrads)
+        if parallel.is_root()
+            @show subgrads_combined
+        end 
 
         return objvals_vec, subgrads_combined
     end
@@ -265,7 +305,7 @@ function rounding_heuristic!(LD::AbstractLagrangeDual)
     if LD.block_model.model.count != LD.block_model.weights.count
         LD.block_model.weights = Dict(block_id => 1/length(LD.block_model.model) for (block_id, model) in LD.block_model.model)
     end
-    coupling_variables_mean = Dict()
+    coupling_variables_value = Dict()
     coupling_variables_lb = Dict()
     coupling_variables_ub = Dict()
     for variables in LD.block_model.coupling_variables

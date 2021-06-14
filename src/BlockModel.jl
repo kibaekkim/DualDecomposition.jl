@@ -44,7 +44,7 @@ mutable struct BlockModel <: AbstractBlockModel
     # TODO: These may be available with heuristics.
     primal_bound::Float64
     primal_solution::Dict{Int, Float64} #coupling_id : value 
-    weights::Dict{Int, Float64} # block_id : value 
+    combined_weights::Dict{Int, Float64} # block_id : value 
     record::Dict{Any, Any}
 
     function BlockModel()
@@ -138,7 +138,7 @@ end
     set the weights of the blocks that will be used by the primal heuristics
 """
 function set_block_weights!(block_model::AbstractBlockModel, weights::Dict{Int, Float64})
-    block_model.weights = weights
+    block_model.combined_weights = weights
 end
 
 """

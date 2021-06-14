@@ -58,5 +58,8 @@ end
 # Set nonanticipativity variables as an array of symbols.
 DD.set_coupling_variables!(algo, coupling_variables)
 
+# Lagrange master method
+LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+
 # Solve the problem with the solver; this solver is for the underlying bundle method.
-DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+DD.run!(algo, LM)

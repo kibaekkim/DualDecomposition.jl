@@ -69,6 +69,12 @@ function deserialize!(serialized, counts::Vector{Cint}, x::Vector{T}) where {T}
     end
 end
 
+function barrier()
+    if nprocs() > 1
+        MPI.Barrier(MPI.COMM_WORLD)
+    end
+end
+
 function allcollect(x::Vector{T}) where {T}
     if nprocs() > 1
         x_serialized = MPI.serialize(x)

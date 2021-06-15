@@ -11,10 +11,6 @@ Lagrangian dual method for dual decomposition. This `mutable struct` constains:
 mutable struct LagrangeDual <: AbstractLagrangeDual
     block_model::BlockModel
     var_to_index::Dict{Tuple{Int,Any},Int} # maps coupling variable to the index wrt the master problem
-    index_to_var::Dict{Int,Tuple{Int,Any}} 
-    bundle_method
-    maxiter::Int # maximum number of iterations
-    tol::Float64 # convergence tolerance
     subsolve_time::Vector{Dict{Int,Float64}}
     subcomm_time::Vector{Float64}
     subobj_value::Vector{Float64}
@@ -24,10 +20,6 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
         LD = new()
         LD.block_model = BlockModel()
         LD.var_to_index = Dict()
-        LD.index_to_var = Dict()
-        LD.bundle_method = T
-        LD.maxiter = maxiter
-        LD.tol = tol
         LD.subsolve_time = []
         LD.subcomm_time = []
         LD.subobj_value = []
@@ -56,7 +48,6 @@ function set_coupling_variables!(LD::AbstractLagrangeDual, variables::Vector{Cou
     all_variable_keys = parallel.allcollect(variable_keys)
     set_variables_by_couple!(LD.block_model, all_variable_keys)
     LD.var_to_index = Dict((v.block_id,v.coupling_id) => i for (i,v) in enumerate(all_variable_keys))
-    LD.index_to_var =  Dict(i => (v.block_id,v.coupling_id) for (i,v) in enumerate(all_variable_keys))
 end
 
 dual_objective_value(LD::AbstractLagrangeDual) = dual_objective_value(LD.block_model)

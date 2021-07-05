@@ -1,5 +1,5 @@
 using DualDecomposition
-using JuMP, Ipopt, Gurobi
+using JuMP, Ipopt, GLPK
 
 const DD = DualDecomposition
 const parallel = DD.parallel
@@ -20,8 +20,7 @@ const Minreq = [200 240 0]    # minimum crop requirement
 
 # This creates a Lagrange dual problem for each scenario s.
 function create_scenario_model(s::Int64)
-    m = Model(Gurobi.Optimizer)
-    set_optimizer_attribute(m, "OutputFlag", 0)
+    m = Model(GLPK.Optimizer)
     @variable(m, 0 <= x[i=CROPS] <= 500, Int)
     @variable(m, y[j=PURCH] >= 0)
     @variable(m, w[k=SELL] >= 0)

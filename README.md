@@ -26,13 +26,13 @@ Please see examples in `./examples`.
 ## Citing this package
 
 ```
-@misc{DualDecomposition.jl.0.2.1,
+@misc{DualDecomposition.jl.0.3.0,
   author       = {Kim, Kibaek and Nakao, Hideaki and Kim, Youngdae and Schanen, Michel and Zhang, Weiqi},
   title        = {{DualDecomposition.jl: Parallel Dual Decomposition in Julia}},
   month        = Mar,
   year         = 2021,
   doi          = {10.5281/zenodo.4574769},
-  version      = {0.2.1},
+  version      = {0.3.0},
   publisher    = {Zenodo},
   url          = {https://doi.org/10.5281/zenodo.4574769}
 }

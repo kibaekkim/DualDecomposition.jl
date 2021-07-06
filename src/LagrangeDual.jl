@@ -11,6 +11,7 @@ Lagrangian dual method for dual decomposition. This `mutable struct` constains:
 mutable struct LagrangeDual <: AbstractLagrangeDual
     block_model::BlockModel
     var_to_index::Dict{Tuple{Int,Any},Int} # maps coupling variable to the index wrt the master problem
+    heuristics::Vector{String}
     subsolve_time::Vector{Dict{Int,Float64}}
     subcomm_time::Vector{Float64}
     subobj_value::Vector{Float64}
@@ -20,6 +21,7 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
         LD = new()
         LD.block_model = BlockModel()
         LD.var_to_index = Dict()
+        LD.heuristics = []
         LD.subsolve_time = []
         LD.subcomm_time = []
         LD.subobj_value = []
@@ -77,6 +79,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         return
     end
 
+    #check avaiable heuristics for the model 
+    check_heuristics!(LD)
+
     function solveLagrangeDual(λ::Array{Float64,1})
         @assert length(λ) == num_all_coupling_variables
 
@@ -108,10 +113,16 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
             # We may want consider other statuses.
             if JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
-                objvals[id] = -JuMP.objective_value(m)
+                try
+                    objvals[id] = -JuMP.dual_objective_value(m)
+                catch e 
+                    objvals[id] = -JuMP.objective_value(m)
+                end
             end
         end
+
         push!(LD.subsolve_time, subsolve_time)
+
 
         # Get subgradients
         for var in coupling_variables(LD)
@@ -119,12 +130,47 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             subgrads[var.key.block_id][index_of_λ(LD, var)] = -JuMP.value(var.ref)
         end
 
+        # TODO: we may be able to add heuristic steps here.
+        #get the values of all coupling variables
+        opt_coupling_val = Dict{Int,SparseVector{Float64}}()
+        coupling_ub = Dict{Int,SparseVector{Float64}}()
+        coupling_lb = Dict{Int,SparseVector{Float64}}()
+        for (id,m) in block_model(LD)
+            opt_coupling_val[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+            coupling_ub[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+            coupling_lb[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+        end
+        #get variable values and bounds
+        for var in coupling_variables(LD)
+            opt_coupling_val[var.key.block_id][index_of_λ(LD, var)] = JuMP.value(var.ref)
+            if JuMP.has_lower_bound(var.ref)
+                coupling_lb[var.key.block_id][index_of_λ(LD, var)] = JuMP.lower_bound(var.ref)
+            else
+                coupling_lb[var.key.block_id][index_of_λ(LD, var)] = - Inf
+            end 
+            if JuMP.has_upper_bound(var.ref)
+                coupling_ub[var.key.block_id][index_of_λ(LD, var)] = JuMP.upper_bound(var.ref)
+            else
+                coupling_ub[var.key.block_id][index_of_λ(LD, var)] = + Inf
+            end 
+        end  
+
+        opt_coupling_val_combined = parallel.combine_dict(opt_coupling_val)
+        coupling_ub_combined = parallel.combine_dict(coupling_ub)
+        coupling_lb_combined = parallel.combine_dict(coupling_lb)   
+
         # Reset objective coefficients
         for var in coupling_variables(LD)
             reset_objective_function!(LD, var, λ[index_of_λ(LD, var)])
-        end
+        end           
 
-        # TODO: we may be able to add heuristic steps here.
+        #run heuristics
+        if "all_blocks" in LD.heuristics
+            all_blocks!(LD, opt_coupling_val_combined, coupling_ub_combined, coupling_lb_combined)
+        end 
+        if "rounding" in LD.heuristics
+            rounding_heuristic!(LD, opt_coupling_val_combined, coupling_ub_combined, coupling_lb_combined)
+        end 
 
         parallel.barrier()
         comm_time = time()
@@ -138,6 +184,8 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             end
             push!(LD.subobj_value, sum(objvals_vec))
         end
+
+
         subgrads_combined = parallel.combine_dict(subgrads)
 
         if parallel.is_root()
@@ -233,7 +281,158 @@ function write_times(LD::AbstractLagrangeDual; dir = ".")
     write_file!(LD.master_time, "master_time.txt", dir)
 end
 
+
+function get_solution!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
+    LD.block_model.dual_solution = copy(BM.get_solution(method))
+end
+
+function check_heuristics!(LD::AbstractLagrangeDual)
+    num_all_blocks = parallel.sum(num_blocks(LD))
+    all_block_ids = Set([ks[1] for (ks, i) in LD.var_to_index])
+    all_coupling_ids = Set([ks[2] for (ks, i) in LD.var_to_index])
+    is_two_stage = true 
+    for block_id in all_block_ids
+        for coupling_id in all_coupling_ids
+            if ! haskey(LD.var_to_index, (block_id, coupling_id))
+                is_two_stage = false 
+                break 
+            end
+        end 
+    end 
+
+    if is_two_stage 
+        push!(LD.heuristics, "all_blocks")
+        push!(LD.heuristics, "rounding")
+    end 
+end 
+
+"""
+rounding heuristic 
+"""
+function rounding_heuristic!(LD::AbstractLagrangeDual, opt_coupling_val, coupling_ub, coupling_lb)
+    #set weights of each model if none exists
+    num_all_blocks = parallel.sum(num_blocks(LD))
+    all_block_ids = Set([ks[1] for (ks, i) in LD.var_to_index])
+    all_coupling_ids = Set([ks[2] for (ks, i) in LD.var_to_index])
+    if num_all_blocks != LD.block_model.combined_weights.count
+        LD.block_model.combined_weights = Dict(block_id => 1/num_all_blocks for block_id in all_block_ids)
+    end
+    
+    # get the mean value of the coupling variables at the root process and broadcast to other processes
+    new_primal_solution = Dict() #maps coupling_id to value 
+    if parallel.is_root()    
+        for (ks, i) in LD.var_to_index
+            coupling_id = ks[2]
+            block_id = ks[1]
+            new_primal_solution[coupling_id] = haskey(new_primal_solution, coupling_id) ? new_primal_solution[coupling_id] + LD.block_model.combined_weights[block_id] * opt_coupling_val[block_id][i] : LD.block_model.combined_weights[block_id] * opt_coupling_val[block_id][i]
+        end         
+        parallel.bcast(new_primal_solution)
+    else
+        new_primal_solution = parallel.bcast(nothing)
+    end 
+    
+    #fix variables with new primal solution and enforce integrality through rounding
+    for variables in LD.block_model.coupling_variables
+        if JuMP.is_integer(variables.ref) || JuMP.is_binary(variables.ref)
+            JuMP.fix(variables.ref, round(new_primal_solution[variables.key.coupling_id]), force=true)
+            new_primal_solution[variables.key.coupling_id] = round(new_primal_solution[variables.key.coupling_id])
+        else
+            JuMP.fix(variables.ref, new_primal_solution[variables.key.coupling_id], force=true)
+            new_primal_solution[variables.key.coupling_id] = new_primal_solution[variables.key.coupling_id]
+        end
+    end  
+
+    #obtain primal bound by solving the subproblems in parallel
+    cur_primal_bound = 0.0
+    for (id,m) in block_model(LD)
+        JuMP.optimize!(m)
+        if ! (JuMP.termination_status(m)  in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED])
+            cur_primal_bound = + Inf 
+            break 
+        else
+            cur_primal_bound += JuMP.objective_value(m)
+        end 
+    end   
+    cur_primal_bound_sum = parallel.sum(cur_primal_bound)
+
+    #update primal bound and solution
+    if cur_primal_bound_sum < LD.block_model.primal_bound
+        LD.block_model.primal_bound = cur_primal_bound_sum
+        LD.block_model.primal_solution = copy(new_primal_solution)
+    end 
+
+    #unfix variables and recover their original bounds
+    for var in coupling_variables(LD)
+        JuMP.unfix(var.ref)
+        JuMP.set_lower_bound(var.ref, coupling_lb[var.key.block_id][index_of_λ(LD, var)])
+        JuMP.set_upper_bound(var.ref, coupling_ub[var.key.block_id][index_of_λ(LD, var)])
+    end  
+end
+
+"""
+all blocks heuristic 
+"""
+function all_blocks!(LD::AbstractLagrangeDual, opt_coupling_val, coupling_ub, coupling_lb)
+    num_all_blocks = parallel.sum(num_blocks(LD))
+    all_block_ids = Set([ks[1] for (ks, i) in LD.var_to_index])
+    all_coupling_ids = Set([ks[2] for (ks, i) in LD.var_to_index])
+    
+    # broadcast the opt_coupling_val
+    if parallel.is_root()
+        parallel.bcast(opt_coupling_val)
+    else
+        opt_coupling_val = parallel.bcast(nothing)
+    end 
+
+    #iterate over all blocks. Fix the coupling variables to the optimal solution of each block.
+    for block_id in all_block_ids
+        new_primal_solution = Dict() #maps coupling_id to value 
+        for coupling_id in all_coupling_ids
+            new_primal_solution[coupling_id] = opt_coupling_val[block_id][LD.var_to_index[block_id, coupling_id]]
+        end       
+
+        #fix variables with new primal solution and enforce integrality
+        for variables in LD.block_model.coupling_variables
+            JuMP.fix(variables.ref, new_primal_solution[variables.key.coupling_id], force=true)
+        end 
+
+        #obtain primal bound by solving the subproblems in parallel
+        cur_primal_bound = 0.0
+        for (id,m) in block_model(LD)
+            JuMP.optimize!(m)
+            if ! (JuMP.termination_status(m)  in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED])
+                cur_primal_bound = + Inf 
+                break 
+            else
+                cur_primal_bound += JuMP.objective_value(m)
+            end 
+        end   
+
+        #update bounds and solution
+        cur_primal_bound_sum = parallel.sum(cur_primal_bound)
+        if cur_primal_bound_sum < LD.block_model.primal_bound
+            LD.block_model.primal_bound = cur_primal_bound_sum
+            LD.block_model.primal_solution = copy(new_primal_solution)
+        end 
+    end 
+
+    if parallel.is_root()
+        @show LD.block_model.primal_bound 
+    end 
+
+    #unfix variables
+    for var in coupling_variables(LD)
+        JuMP.unfix(var.ref)
+        JuMP.set_lower_bound(var.ref, coupling_lb[var.key.block_id][index_of_λ(LD, var)])
+        JuMP.set_upper_bound(var.ref, coupling_ub[var.key.block_id][index_of_λ(LD, var)])
+    end     
+  
+end
+
+
+
 function write_all(LD::AbstractLagrangeDual; dir = ".")
     write_times(LD, dir = dir)
     write_file!(LD.subobj_value, "subobj_value.txt", dir)
 end
+

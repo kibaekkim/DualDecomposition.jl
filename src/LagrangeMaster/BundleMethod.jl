@@ -48,3 +48,4 @@ run!(method::BundleMaster) = BM.run!(method.inner)
 get_objective(method::BundleMaster) = -BM.get_objective_value(method.inner)
 get_solution(method::BundleMaster) = copy(BM.get_solution(method.inner))
 get_times(method::BundleMaster)::Vector{Float64} = method.inner.model.time
+set_bound(method::BundleMaster, val::Float64) = BM.set_obj_limit(method.inner, val)

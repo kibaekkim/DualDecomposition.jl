@@ -27,9 +27,9 @@ Please see examples in `./examples`.
 
 ```
 @misc{DualDecomposition.jl.0.3.0,
-  author       = {Kim, Kibaek and Nakao, Hideaki and Kim, Youngdae and Schanen, Michel and Zhang, Weiqi},
+  author       = {Kim, Kibaek and Nakao, Hideaki and Kim, Youngdae and Schanen, Michel and Zhang, Weiqi and Li, Can},
   title        = {{DualDecomposition.jl: Parallel Dual Decomposition in Julia}},
-  month        = Mar,
+  month        = July,
   year         = 2021,
   doi          = {10.5281/zenodo.4574769},
   version      = {0.3.0},

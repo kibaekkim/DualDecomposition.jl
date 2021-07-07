@@ -142,6 +142,6 @@ end
 get_objective(method::SubgradientMaster) = method.best_f
 get_solution(method::SubgradientMaster) = method.best_x
 get_times(method::SubgradientMaster)::Vector{Float64} = method.iteration_time
-function set_bound(method::SubgradientMaster, val::Float64)
+function set_obj_limit!(method::SubgradientMaster, val::Float64)
     method.obj_limit = val
 end

@@ -65,6 +65,14 @@ const DD = DualDecomposition
             LM = DD.SubgradientMaster()
             LM.maxiter = 1000
             LM.step_size = (method) -> (abs(-108390 - method.f) / norm(method.∇f)^2) # Polyak's
+
+            @testset "objective limit" begin
+                DD.set_obj_limit!(LM, -110000.)
+                DD.run!(algo, LM)
+                @show DD.dual_objective_value(algo)
+                @test DD.dual_objective_value(algo) > -110000.
+            end
+            DD.set_obj_limit!(LM, -100000.)
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
             DD.run!(algo, LM)
@@ -88,6 +96,14 @@ const DD = DualDecomposition
 
             # Lagrange master method
             LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+
+            @testset "objective limit" begin
+                DD.set_obj_limit!(LM, -111000.)
+                DD.run!(algo, LM)
+                @show DD.dual_objective_value(algo)
+                @test DD.dual_objective_value(algo) > -111000.
+            end
+            DD.set_obj_limit!(LM, -100000.)
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
             DD.run!(algo, LM)
@@ -111,6 +127,14 @@ const DD = DualDecomposition
 
             # Lagrange master method
             LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
+
+            @testset "objective limit" begin
+                DD.set_obj_limit!(LM, -111000.)
+                DD.run!(algo, LM)
+                @show DD.dual_objective_value(algo)
+                @test DD.dual_objective_value(algo) > -111000.
+            end
+            DD.set_obj_limit!(LM, -100000.)
             
             # Solve the problem with the solver; this solver is for the underlying bundle method.
             DD.run!(algo, LM)

@@ -14,6 +14,7 @@ mutable struct BundleMaster <: AbstractLagrangeMaster
     optimizer::Union{Nothing,DataType,MOI.OptimizerWithAttributes}
     inner::Union{Nothing,BM.AbstractMethod}
     params::BM.Parameters
+    obj_limit::Float64
 
     function BundleMaster(constructor, optimizer, params = BM.Parameters())
         bm = new()
@@ -21,6 +22,7 @@ mutable struct BundleMaster <: AbstractLagrangeMaster
         bm.optimizer = optimizer
         bm.inner = nothing
         bm.params = params
+        bm.obj_limit = Inf
         return bm
     end
 end
@@ -34,6 +36,9 @@ function load!(method::BundleMaster, num_coupling_variables::Int, num_blocks::In
 
     # This builds the bunlde model.
     BM.build_bundle_model!(method.inner)
+
+    # set objective limit
+    BM.set_obj_limit(method.inner, -method.obj_limit)
 end
 
 function add_constraints!(LD::AbstractLagrangeDual, method::BundleMaster)
@@ -48,3 +53,6 @@ run!(method::BundleMaster) = BM.run!(method.inner)
 get_objective(method::BundleMaster) = -BM.get_objective_value(method.inner)
 get_solution(method::BundleMaster) = copy(BM.get_solution(method.inner))
 get_times(method::BundleMaster)::Vector{Float64} = method.inner.model.time
+function set_obj_limit!(method::BundleMaster, val::Float64)
+    method.obj_limit = val
+end

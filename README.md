@@ -31,10 +31,10 @@ Please see examples in `./examples`.
   title        = {{DualDecomposition.jl: Parallel Dual Decomposition in Julia}},
   month        = July,
   year         = 2021,
-  doi          = {10.5281/zenodo.4574769},
+  doi          = {10.5281/zenodo.5079761},
   version      = {0.3.0},
   publisher    = {Zenodo},
-  url          = {https://doi.org/10.5281/zenodo.4574769}
+  url          = {https://doi.org/10.5281/zenodo.5079761}
 }
 ```
 

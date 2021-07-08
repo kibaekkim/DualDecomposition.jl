@@ -4,6 +4,8 @@ Scenario Tree
 """
 
 
+
+
 struct TreeNode
     parent::Int                                 # index of parent node
     children::Vector{Int}                       # indices of child nodes

@@ -1,4 +1,5 @@
 using JuMP, Ipopt, GLPK
+using SDDP
 using DualDecomposition
 using Random
 

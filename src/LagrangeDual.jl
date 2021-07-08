@@ -103,6 +103,7 @@ function run!(LD::AbstractLagrangeDual, optimizer, bundle_init::Union{Nothing,Ar
             # Solver the Lagrange dual
             solve_sub_block!(m)
 
+            @show id, JuMP.termination_status(m)
             @assert JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
 
             # We may want consider other statuses.

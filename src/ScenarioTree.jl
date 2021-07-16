@@ -3,6 +3,48 @@
 Scenario Tree
 """
 
+function add_node!(graph::Plasmo.OptiGraph, ξ::Any, pt::Union{Plasmo.OptiNode,Nothing}, prob::Float64) :: Plasmo.OptiNode
+    nd = Plasmo.add_node!(graph)
+    nd.ext[:parent] = pt
+    nd.ext[:child] = Array{Tuple{Plasmo.OptiNode, Float64},1}()
+    nd.ext[:stage] = pt.ext[:stage] + 1
+    nd.ext[:ξ] = ξ
+    nd.ext[:p] = pt.ext[:p] * prob
+    nd.ext[:out] = Dict{JuMP.VariableRef,Array{JuMP.VariableRef,1}}()
+
+    push!(pt.ext[:child], (nd, prob))
+    return nd
+end
+
+function add_node!(graph::Plasmo.OptiGraph, ξ::Any) :: Plasmo.OptiNode
+    nd = Plasmo.add_node!(graph)
+    nd.ext[:parent] = nothing
+    nd.ext[:child] = Array{Tuple{Plasmo.OptiNode, Float64},1}()
+    nd.ext[:stage] = 1
+    nd.ext[:ξ] = ξ
+    nd.ext[:p] = 1.0
+    nd.ext[:out] = Dict{JuMP.VariableRef,Array{JuMP.VariableRef,1}}()
+    return nd
+end
+
+function set_state_variables!(nd::Plasmo.OptiNode, ndvar::JuMP.VariableRef)
+    nd.ext[:out][ndvar] = Array{JuMP.VariableRef,1}()
+end
+
+function link_variables!(graph::Plasmo.OptiGraph, pt::Plasmo.OptiNode, ptvar::JuMP.VariableRef, ndvar::JuMP.VariableRef)
+    #assuming that out-going variables are all the same, add out-going variable references
+    push!(pt.ext[:out][ptvar], ndvar)
+    @linkconstraint(graph, ptvar == ndvar)
+end
+
+function check_leaf(node::Plasmo.OptiNode)::Bool
+    if length(node.ext[:child]) == 0
+        return true
+    else
+        return false
+    end
+end
+
 
 
 

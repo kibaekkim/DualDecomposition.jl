@@ -7,11 +7,14 @@ function multistage_decomposition!(
     graph::Plasmo.OptiGraph, 
     algo::LagrangeDual, 
     LM::AbstractLagrangeMaster,
-    node_cluster::Array{Array{Array{Plasmo.OptiNode,1},1},1}
+    node_cluster::Vector{Vector{Plasmo.OptiNode}}
     )
     # convert node_clusters into set of models:: Dict{Int,JuMP.Model}
-    # -> how to construct OptiGraph from subset of nodes
-    # -> how to convert Optigraph to JuMP.Model
+    # -> construct subgraph from set of nodes
+    partition = Plasmo.Partition(graph, node_cluster)
+    make_subgraphs!(partition)
+
+    # -> convert Optigraph to JuMP.Model
 
     # for each models, add_block_model!(algo, blockid, models[blockid])
 
@@ -22,8 +25,8 @@ function multistage_decomposition!(
     set_coupling_variables!(algo, coupling_variables)
 
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    run!(algo, LM)
-
+    #run!(algo, LM)
+    return algo
 end
 
 # ordinary scenario decomposition
@@ -32,39 +35,14 @@ function multistage_scenario_decomposition!(
     algo::LagrangeDual, 
     LM::AbstractLagrangeMaster,
     )
-    node_cluster = Array{Array{Array{Plasmo.OptiNode,1},1},1}()
+    node_cluster = Vector{Vector{Plasmo.OptiNode}}()
     for node in Plasmo.getnodes(graph)
         if check_leaf(node)
-            scenario = Array{Plasmo.OptiNode,1}()
+            scenario = Vector{Plasmo.OptiNode}()
             current = node
             while true 
                 println(scenario)
                 pushfirst!(scenario, current)
-                if isnothing(current.ext[:parent])
-                    break
-                else
-                    current = current.ext[:parent]
-                end
-            end
-            push!(node_cluster, [scenario])
-        end
-    end
-    multistage_decomposition!(graph, algo, LM, node_cluster)
-end
-
-# total temporal decomposition
-function multistage_total_decomposition!(
-    graph::Plasmo.OptiGraph, 
-    algo::LagrangeDual, 
-    LM::AbstractLagrangeMaster,
-    )
-    node_cluster = Array{Array{Array{Plasmo.OptiNode,1},1},1}()
-    for node in Plasmo.getnodes(graph)
-        if check_leaf(node)
-            scenario = Array{Array{Plasmo.OptiNode,1},1}()
-            current = node
-            while true 
-                pushfirst!(scenario, [current])
                 if isnothing(current.ext[:parent])
                     break
                 else
@@ -77,10 +55,30 @@ function multistage_total_decomposition!(
     multistage_decomposition!(graph, algo, LM, node_cluster)
 end
 
-function check_leaf(node::Plasmo.OptiNode)::Bool
-    if length(node.ext[:child]) == 0
-        return true
-    else
-        return false
+# total temporal decomposition
+function multistage_total_decomposition!(
+    graph::Plasmo.OptiGraph, 
+    algo::LagrangeDual, 
+    LM::AbstractLagrangeMaster,
+    )
+    node_cluster = Vector{Vector{Plasmo.OptiNode}}()
+    for node in Plasmo.getnodes(graph)
+        if check_leaf(node)
+            current = node
+            while true 
+                push!(node_cluster, [current])
+                if isnothing(current.ext[:parent])
+                    break
+                else
+                    current = current.ext[:parent]
+                end
+            end
+        end
     end
+    multistage_decomposition!(graph, algo, LM, node_cluster)
+end
+
+# output JuMP.Model from set of nodes or subgraph
+function create_model(nodes::Array{Plasmo.OptiNode,1})
+
 end

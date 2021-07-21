@@ -285,22 +285,3 @@ function get_solution!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
 end
 
 include("PrimalHeuristics.jl")
-
-function check_heuristics!(LD::AbstractLagrangeDual)
-    all_block_ids = Set([ks[1] for (ks, i) in LD.var_to_index])
-    all_coupling_ids = Set([ks[2] for (ks, i) in LD.var_to_index])
-    is_two_stage = true 
-    for block_id in all_block_ids
-        for coupling_id in all_coupling_ids
-            if ! haskey(LD.var_to_index, (block_id, coupling_id))
-                is_two_stage = false 
-                break 
-            end
-        end 
-    end 
-
-    if is_two_stage 
-        # add!(AllBlockHeuristic, LD)
-        add!(RoundingHeuristic, LD)
-    end 
-end 

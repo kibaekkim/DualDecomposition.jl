@@ -51,35 +51,47 @@ end
 struct TreeNode
     parent::Int                                 # index of parent node
     children::Vector{Int}                       # indices of child nodes
-    k::Int                                      # current stage
-    ξ::Vector{Float64}                          # current scenario
+    stage::Int                                  # current stage
+    ξ::Dict{Symbol,Any}                         # current scenario
+    p::Float64                                  # probability of node
 end
 
 abstract type AbstractTree end
 
 mutable struct Tree <: AbstractTree
-    nodes::Vector{TreeNode}     # list of nodes
-    K::Int                      # length of tree
+    nodes::Dict{Int,TreeNode}     # list of nodes
+    depth::Int                  # depth of tree
 end
 
-Tree(ξ::Vector{Float64}) = Tree([TreeNode(0, Vector{Int}(), 1, ξ )], 1)
+Tree(ξ::Dict{Symbol,Any}) = Tree(Dict{1 => TreeNode(0, Vector{Int}(), 1, ξ, 1.0 )}, 1)
 
-function addchild!(tree::Tree, id::Int, ξ::Vector{Float64})
-    #   adds child node to tree.nodes[id]
-    1 <= id <= length(tree.nodes) || throw(BoundsError(tree, id))   # check if id is valid
-    k = get_stage(tree, id) + 1                                     # get new stage value
-    push!(tree.nodes, TreeNode(id, Vector{}(), k, ξ ))              # push to node list
-    child_id = length(tree.nodes)                                   # get current node ID
-    push!(tree.nodes[id].children, child_id)                        # push child_id to parent node children
-    if k > tree.K
-        tree.K = k  # update length of tree to the maximum value
+function add_node!(tree::Tree, node::TreeNode)
+    id = length(tree.nodes)
+    tree.nodes[id] = node
+    return id
+end
+
+function add_child!(tree::Tree, pt::Int, ξ::Dict{Symbol,Any}, prob::Float64)
+    #   adds child node to tree.nodes[pt]
+    1 <= pt <= length(tree.nodes) || throw(BoundsError(tree, pt))   # check if pt is valid
+    stage = get_stage(tree, pt) + 1                                 # get new stage value
+    p = get_probability(tree, pt) * prob                            # get new node probability
+    node = TreeNode(pt, Vector{Int}(), stage, ξ, p )                # create node
+    child_id = add_node!(tree, node)                                # add to tree and get node ID
+    push!(tree.nodes[pt].children, child_id)                        # push child_id to parent node children
+    if stage > tree.depth
+        tree.depth = stage                                          # update length of tree to the maximum value
     end
 end
 
 get_children(tree, id) = tree.nodes[id].children
 get_parent(tree,id) = tree.nodes[id].parent
-get_stage(tree, id) = tree.nodes[id].k
+get_stage(tree, id) = tree.nodes[id].stage
 get_scenario(tree, id) = tree.nodes[id].ξ
+get_probability(tree, id) = tree.nodes[id].p
+get_node(tree, id) = tree.nodes[id]
+
+
 
 function get_history(tree::AbstractTree, id::Int)::Array{Int}
     # gets a vector of tree node IDs up until current

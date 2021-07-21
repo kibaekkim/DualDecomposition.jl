@@ -41,7 +41,6 @@ function multistage_scenario_decomposition!(
             scenario = Vector{Plasmo.OptiNode}()
             current = node
             while true 
-                println(scenario)
                 pushfirst!(scenario, current)
                 if isnothing(current.ext[:parent])
                     break
@@ -76,9 +75,4 @@ function multistage_total_decomposition!(
         end
     end
     multistage_decomposition!(graph, algo, LM, node_cluster)
-end
-
-# output JuMP.Model from set of nodes or subgraph
-function create_model(nodes::Array{Plasmo.OptiNode,1})
-
 end

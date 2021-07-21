@@ -154,3 +154,17 @@ dual_objective_value(block_model::AbstractBlockModel) = block_model.dual_bound
 This returns a vector of dual solution obtained from a method.
 """
 dual_solution(block_model::AbstractBlockModel) = block_model.dual_solution
+
+"""
+primal_objective_value
+
+This returns the best primal objective value obtained from a method.
+"""
+primal_objective_value(block_model::AbstractBlockModel) = block_model.primal_bound
+
+"""
+primal_solution
+
+This returns a vector of the best primal solution obtained from a method.
+"""
+primal_solution(block_model::AbstractBlockModel) = block_model.primal_solution

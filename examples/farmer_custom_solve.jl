@@ -68,7 +68,6 @@ DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
 
 #=
 # Method 2: write a function that encompasses self-defined solve_sub_block!
-
 function run_algo!(algo::AbstractLagrangeDual)
     # Define custom sub_block_model!
     function DD.solve_sub_block!(model::JuMP.Model)
@@ -77,8 +76,6 @@ function run_algo!(algo::AbstractLagrangeDual)
     end
     DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
 end
-
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 run_algo!(algo)
 =#
-

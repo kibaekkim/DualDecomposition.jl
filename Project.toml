@@ -1,7 +1,7 @@
 name = "DualDecomposition"
 uuid = "d0e446f1-e135-48f1-a6ea-e9a6190f2a7a"
 authors = ["Kibaek Kim <kimk@anl.gov>"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
 BundleMethod = "e8a6717a-069f-43d5-9ac2-a49b1ec5be7b"
@@ -14,9 +14,9 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-BundleMethod = "0.3.1"
-JuMP = "0.21.6"
-MPI = "0.16"
+BundleMethod = "0.3.2"
+JuMP = "0.21.8"
+MPI = "0.16.1"
 julia = "1"
 
 [extras]

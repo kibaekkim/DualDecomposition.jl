@@ -42,8 +42,10 @@ mutable struct BlockModel <: AbstractBlockModel
     dual_solution::Vector{Float64}
 
     # TODO: These may be available with heuristics.
-    # primal_bound::Float64
-    # primal_solution::Vector{Float64}
+    primal_bound::Float64
+    primal_solution::Dict{Int, Float64} #coupling_id : value 
+    combined_weights::Dict{Int, Float64} # block_id : value 
+    record::Dict{Any, Any}
 
     function BlockModel()
         return new(
@@ -51,7 +53,11 @@ mutable struct BlockModel <: AbstractBlockModel
             [],
             Dict(),
             0.0,
-            [])
+            [],
+            +Inf,
+            Dict(),
+            Dict(),
+            Dict())
     end
 end
 
@@ -128,6 +134,14 @@ function set_variables_by_couple!(block_model::AbstractBlockModel, variables::Ve
 end
 
 """
+    set_block_weights!
+    set the weights of the blocks that will be used by the primal heuristics
+"""
+function set_block_weights!(block_model::AbstractBlockModel, weights::Dict{Int, Float64})
+    block_model.combined_weights = weights
+end
+
+"""
     dual_objective_value
 
 This returns the dual objective value obtained from a method.
@@ -140,3 +154,17 @@ dual_objective_value(block_model::AbstractBlockModel) = block_model.dual_bound
 This returns a vector of dual solution obtained from a method.
 """
 dual_solution(block_model::AbstractBlockModel) = block_model.dual_solution
+
+"""
+primal_objective_value
+
+This returns the best primal objective value obtained from a method.
+"""
+primal_objective_value(block_model::AbstractBlockModel) = block_model.primal_bound
+
+"""
+primal_solution
+
+This returns a vector of the best primal solution obtained from a method.
+"""
+primal_solution(block_model::AbstractBlockModel) = block_model.primal_solution

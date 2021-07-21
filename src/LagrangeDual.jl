@@ -11,6 +11,7 @@ Lagrangian dual method for dual decomposition. This `mutable struct` constains:
 mutable struct LagrangeDual <: AbstractLagrangeDual
     block_model::BlockModel
     var_to_index::Dict{Tuple{Int,Any},Int} # maps coupling variable to the index wrt the master problem
+    heuristics::Vector{Type}
     subsolve_time::Vector{Dict{Int,Float64}}
     subcomm_time::Vector{Float64}
     subobj_value::Vector{Float64}
@@ -20,6 +21,7 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
         LD = new()
         LD.block_model = BlockModel()
         LD.var_to_index = Dict()
+        LD.heuristics = []
         LD.subsolve_time = []
         LD.subcomm_time = []
         LD.subobj_value = []
@@ -52,6 +54,8 @@ end
 
 dual_objective_value(LD::AbstractLagrangeDual) = dual_objective_value(LD.block_model)
 dual_solution(LD::AbstractLagrangeDual) = dual_solution(LD.block_model)
+primal_objective_value(LD::AbstractLagrangeDual) = primal_objective_value(LD.block_model)
+primal_solution(LD::AbstractLagrangeDual) = primal_solution(LD.block_model)
 
 
 """
@@ -108,10 +112,16 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
             # We may want consider other statuses.
             if JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
-                objvals[id] = -JuMP.objective_value(m)
+                try
+                    objvals[id] = -JuMP.dual_objective_value(m)
+                catch e 
+                    objvals[id] = -JuMP.objective_value(m)
+                end
             end
         end
+
         push!(LD.subsolve_time, subsolve_time)
+
 
         # Get subgradients
         for var in coupling_variables(LD)
@@ -119,12 +129,43 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             subgrads[var.key.block_id][index_of_λ(LD, var)] = -JuMP.value(var.ref)
         end
 
+        #get the values of all coupling variables
+        opt_coupling_val = Dict{Int,SparseVector{Float64}}()
+        coupling_ub = Dict{Int,SparseVector{Float64}}()
+        coupling_lb = Dict{Int,SparseVector{Float64}}()
+        for (id,m) in block_model(LD)
+            opt_coupling_val[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+            coupling_ub[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+            coupling_lb[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+        end
+        #get variable values and bounds
+        for var in coupling_variables(LD)
+            opt_coupling_val[var.key.block_id][index_of_λ(LD, var)] = JuMP.value(var.ref)
+            if JuMP.has_lower_bound(var.ref)
+                coupling_lb[var.key.block_id][index_of_λ(LD, var)] = JuMP.lower_bound(var.ref)
+            else
+                coupling_lb[var.key.block_id][index_of_λ(LD, var)] = - Inf
+            end 
+            if JuMP.has_upper_bound(var.ref)
+                coupling_ub[var.key.block_id][index_of_λ(LD, var)] = JuMP.upper_bound(var.ref)
+            else
+                coupling_ub[var.key.block_id][index_of_λ(LD, var)] = + Inf
+            end 
+        end  
+
+        opt_coupling_val_combined = parallel.combine_dict(opt_coupling_val)
+        coupling_ub_combined = parallel.combine_dict(coupling_ub)
+        coupling_lb_combined = parallel.combine_dict(coupling_lb)
+
+        #run heuristics
+        for htype in LD.heuristics
+            run!(htype, LD, opt_coupling_val_combined, coupling_ub_combined, coupling_lb_combined)
+        end
+
         # Reset objective coefficients
         for var in coupling_variables(LD)
             reset_objective_function!(LD, var, λ[index_of_λ(LD, var)])
-        end
-
-        # TODO: we may be able to add heuristic steps here.
+        end        
 
         parallel.barrier()
         comm_time = time()
@@ -138,6 +179,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             end
             push!(LD.subobj_value, sum(objvals_vec))
         end
+
         subgrads_combined = parallel.combine_dict(subgrads)
 
         if parallel.is_root()
@@ -237,3 +279,9 @@ function write_all(LD::AbstractLagrangeDual; dir = ".")
     write_times(LD, dir = dir)
     write_file!(LD.subobj_value, "subobj_value.txt", dir)
 end
+
+function get_solution!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)
+    LD.block_model.dual_solution = copy(BM.get_solution(method))
+end
+
+include("PrimalHeuristics.jl")

@@ -1,6 +1,7 @@
 # DualDecomposition.jl
 ![Run tests](https://github.com/kibaekkim/DualDecomposition.jl/workflows/Run%20tests/badge.svg)
 [![codecov](https://codecov.io/gh/kibaekkim/DualDecomposition.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/kibaekkim/DualDecomposition.jl)
+[![DOI](https://zenodo.org/badge/169820113.svg)](https://zenodo.org/badge/latestdoi/169820113)
 
 This package implements an algorithmic framework for parallel dual decomposition methods in Julia.
 While not aiming to outperforming the decomposition solvers written in a low-level 
@@ -21,6 +22,21 @@ This package can be installed by cloning this repository:
 ## Examples
 
 Please see examples in `./examples`.
+
+## Citing this package
+
+```
+@misc{DualDecomposition.jl.0.3.0,
+  author       = {Kim, Kibaek and Nakao, Hideaki and Kim, Youngdae and Schanen, Michel and Zhang, Weiqi and Li, Can},
+  title        = {{DualDecomposition.jl: Parallel Dual Decomposition in Julia}},
+  month        = July,
+  year         = 2021,
+  doi          = {10.5281/zenodo.5079761},
+  version      = {0.3.0},
+  publisher    = {Zenodo},
+  url          = {https://doi.org/10.5281/zenodo.5079761}
+}
+```
 
 ## Acknowledgements
 

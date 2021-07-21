@@ -1,1 +1,5 @@
+*DS_Store
 test/*.txt
+._*
+examples/*.txt
+Manifest.toml

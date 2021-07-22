@@ -3,38 +3,83 @@
 Scenario Tree
 """
 
-function add_node!(graph::Plasmo.OptiGraph, ξ::Any, pt::Union{Plasmo.OptiNode,Nothing}, prob::Float64) :: Plasmo.OptiNode
+function add_node!(graph::Plasmo.OptiGraph, ξ:: Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}},
+        pt::Union{Plasmo.OptiNode,Nothing}, prob::Float64) :: Plasmo.OptiNode
     nd = Plasmo.add_node!(graph)
     nd.ext[:parent] = pt
     nd.ext[:child] = Array{Tuple{Plasmo.OptiNode, Float64},1}()
     nd.ext[:stage] = pt.ext[:stage] + 1
     nd.ext[:ξ] = ξ
     nd.ext[:p] = pt.ext[:p] * prob
-    nd.ext[:out] = Dict{JuMP.VariableRef,Array{JuMP.VariableRef,1}}()
+    nd.ext[:in] = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
+    nd.ext[:out] = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
 
     push!(pt.ext[:child], (nd, prob))
     return nd
 end
 
-function add_node!(graph::Plasmo.OptiGraph, ξ::Any) :: Plasmo.OptiNode
+function add_node!(graph::Plasmo.OptiGraph, ξ::Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}) :: Plasmo.OptiNode
     nd = Plasmo.add_node!(graph)
     nd.ext[:parent] = nothing
     nd.ext[:child] = Array{Tuple{Plasmo.OptiNode, Float64},1}()
     nd.ext[:stage] = 1
     nd.ext[:ξ] = ξ
     nd.ext[:p] = 1.0
-    nd.ext[:out] = Dict{JuMP.VariableRef,Array{JuMP.VariableRef,1}}()
+    nd.ext[:in] = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
+    nd.ext[:out] = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
     return nd
 end
 
-function set_state_variables!(nd::Plasmo.OptiNode, ndvar::JuMP.VariableRef)
-    nd.ext[:out][ndvar] = Array{JuMP.VariableRef,1}()
+function set_input_variable!(nd::Plasmo.OptiNode, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
+    nd.ext[:in][symb] = var
 end
 
-function link_variables!(graph::Plasmo.OptiGraph, pt::Plasmo.OptiNode, ptvar::JuMP.VariableRef, ndvar::JuMP.VariableRef)
-    #assuming that out-going variables are all the same, add out-going variable references
-    push!(pt.ext[:out][ptvar], ndvar)
-    @linkconstraint(graph, ptvar == ndvar)
+function set_output_variable!(nd::Plasmo.OptiNode, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
+    nd.ext[:out][symb] = var
+end
+
+struct SubTree
+    tree::Plasmo.OptiGraph
+    parent::Union{Plasmo.OptiNode,Nothing}
+end
+
+function create_subtree(graph = Plasmo.OptiGraph, nodes::Vector{Plasmo.OptiNode})::SubTree
+    subtree = Plasmo.OptiGraph()
+    nodedict = Dict{Int64,Plasmo.OptiNode}()
+    # add nodes to subtree and create dictionary
+    for node in nodes
+        Plasmo.add_node!(subtree, node)
+        nodeidx = getindex(graph, node)
+        nodedict[nodeidx] = node
+    end
+    # create edges and get parent of subtree
+    subtree_parent = nothing
+    for node in nodes
+        if !isnothing(node.ext[:parent])
+            parentidx = getindex(graph, node.ext[:parent])
+            if haskey(nodedict, parentidx)
+                parent = nodedict[parentidx]
+                link_variables_directed!(subtree, node, parent)
+            else 
+                subtree_parent = node.ext[:parent]
+            end
+        end
+    end
+    return SubTree(subtree, subtree_parent)
+end
+
+function link_variables_directed!(graph::Plasmo.OptiGraph, child::Plasmo.OptiNode, parent::Plasmo.OptiNode)
+    for (symb, var1) in child.ext[:in]
+        var2 = parent.ext[:out][symb]
+        @linkconstraint(graph, var1 .== var2)
+    end
+end
+
+function link_variables_common!(graph::Plasmo.OptiGraph, node1::Plasmo.OptiNode, node2::Plasmo.OptiNode)
+    for (symb, var1) in node1.ext[:out]
+        var2 = node2.ext[:out][symb]
+        @linkconstraint(graph, var1 .== var2)
+    end
 end
 
 function check_leaf(node::Plasmo.OptiNode)::Bool

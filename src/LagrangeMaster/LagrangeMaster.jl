@@ -73,3 +73,15 @@ This returns the solution times of Lagrangian master for all iterations.
 - `method`: Lagrangian master
 """
 get_times(method::AbstractLagrangeMaster)::Vector{Float64} = zeros(1)
+
+
+"""
+set_obj_limit!
+
+This sets the Lagrangian bound limit.
+
+# Arguments
+- `method`: Lagrangian master
+- `val`: objective limit value
+"""
+function set_obj_limit!(method::AbstractLagrangeMaster, val::Float64) end

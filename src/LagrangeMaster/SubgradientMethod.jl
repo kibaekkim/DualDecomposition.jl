@@ -10,6 +10,7 @@ mutable struct SubgradientMaster <: AbstractLagrangeMaster
 
     iter::Int # current iteration count
     maxiter::Int
+    obj_limit::Float64
 
     f::Float64
     best_f::Float64
@@ -31,6 +32,7 @@ mutable struct SubgradientMaster <: AbstractLagrangeMaster
         sg.eval_f = nothing
         sg.iter = 0
         sg.maxiter = 1000
+        sg.obj_limit = +Inf
         sg.f = -Inf
         sg.best_f = -Inf
         sg.x = []
@@ -130,9 +132,16 @@ function run!(method::SubgradientMaster)
         @printf("\t%7.2f", total_master_time)
         @printf("\t%8.2f", total_time)
         @printf("\n")
+
+        if method.obj_limit < method.best_f
+            break
+        end
     end
 end
 
 get_objective(method::SubgradientMaster) = method.best_f
 get_solution(method::SubgradientMaster) = method.best_x
 get_times(method::SubgradientMaster)::Vector{Float64} = method.iteration_time
+function set_obj_limit!(method::SubgradientMaster, val::Float64)
+    method.obj_limit = val
+end

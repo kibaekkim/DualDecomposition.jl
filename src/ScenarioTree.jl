@@ -4,29 +4,21 @@ Scenario Tree
 """
 
 function add_node!(graph::Plasmo.OptiGraph, ξ:: Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}},
-        pt::Union{Plasmo.OptiNode,Nothing}, prob::Float64) :: Plasmo.OptiNode
+        pt::Union{Plasmo.OptiNode,Nothing} = nothing, prob::Float64 = 1.0) :: Plasmo.OptiNode
     nd = Plasmo.add_node!(graph)
     nd.ext[:parent] = pt
     nd.ext[:child] = Array{Tuple{Plasmo.OptiNode, Float64},1}()
-    nd.ext[:stage] = pt.ext[:stage] + 1
     nd.ext[:ξ] = ξ
-    nd.ext[:p] = pt.ext[:p] * prob
     nd.ext[:in] = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
     nd.ext[:out] = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
-
-    push!(pt.ext[:child], (nd, prob))
-    return nd
-end
-
-function add_node!(graph::Plasmo.OptiGraph, ξ::Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}) :: Plasmo.OptiNode
-    nd = Plasmo.add_node!(graph)
-    nd.ext[:parent] = nothing
-    nd.ext[:child] = Array{Tuple{Plasmo.OptiNode, Float64},1}()
-    nd.ext[:stage] = 1
-    nd.ext[:ξ] = ξ
-    nd.ext[:p] = 1.0
-    nd.ext[:in] = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
-    nd.ext[:out] = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
+    if isnothing(pt)
+        nd.ext[:stage] = 1
+        nd.ext[:p] = 1.0
+    else
+        nd.ext[:stage] = pt.ext[:stage] + 1
+        nd.ext[:p] = pt.ext[:p] * prob
+        push!(pt.ext[:child], (nd, prob))
+    end
     return nd
 end
 
@@ -38,9 +30,10 @@ function set_output_variable!(nd::Plasmo.OptiNode, symb::Symbol, var::Union{JuMP
     nd.ext[:out][symb] = var
 end
 
-struct SubTree
+mutable struct SubTree
     tree::Plasmo.OptiGraph
     parent::Union{Plasmo.OptiNode,Nothing}
+    child::Union{Plasmo.OptiNode,Nothing}
 end
 
 function create_subtree(graph = Plasmo.OptiGraph, nodes::Vector{Plasmo.OptiNode})::SubTree
@@ -54,31 +47,61 @@ function create_subtree(graph = Plasmo.OptiGraph, nodes::Vector{Plasmo.OptiNode}
     end
     # create edges and get parent of subtree
     subtree_parent = nothing
+    subtree_child = nothing
     for node in nodes
         if !isnothing(node.ext[:parent])
             parentidx = getindex(graph, node.ext[:parent])
             if haskey(nodedict, parentidx)
                 parent = nodedict[parentidx]
-                link_variables_directed!(subtree, node, parent)
+                link_variables!(subtree, node, parent)
             else 
                 subtree_parent = node.ext[:parent]
+                subtree_child = node
             end
         end
     end
-    return SubTree(subtree, subtree_parent)
+    return SubTree(subtree, subtree_parent, subtree_child)
 end
 
-function link_variables_directed!(graph::Plasmo.OptiGraph, child::Plasmo.OptiNode, parent::Plasmo.OptiNode)
+function link_variables!(graph::Plasmo.OptiGraph, child::Plasmo.OptiNode, parent::Plasmo.OptiNode)
     for (symb, var1) in child.ext[:in]
         var2 = parent.ext[:out][symb]
         @linkconstraint(graph, var1 .== var2)
     end
 end
 
-function link_variables_common!(graph::Plasmo.OptiGraph, node1::Plasmo.OptiNode, node2::Plasmo.OptiNode)
-    for (symb, var1) in node1.ext[:out]
-        var2 = node2.ext[:out][symb]
-        @linkconstraint(graph, var1 .== var2)
+
+
+function couple_common_variables!(coupling_variables::Vector{DD.CouplingVariableRef}, block_id::Int, node::Plasmo.OptiNode)
+    label = node.label
+    for (symb, var) in node.ext[:out]
+        couple_variables!(coupling_variables, block_id, label, symb, var)
+    end
+end
+
+function couple_variables!(coupling_variables::Vector{DD.CouplingVariableRef}, block_id::Int, label::String, symb::Symbol, 
+        var::JuMP.VariableRef)
+    push!(coupling_variables, CouplingVariableRef(block_id, [label, symb], var))
+end
+
+function couple_variables!(coupling_variables::Vector{DD.CouplingVariableRef}, block_id::Int, label::String, symb::Symbol, 
+        var::Array{JuMP.VariableRef})
+    for (index, value) in pairs(var)
+        push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, Tuple(index)], value))
+    end
+end
+
+function couple_variables!(coupling_variables::Vector{DD.CouplingVariableRef}, block_id::Int, label::String, symb::Symbol, 
+        var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef})
+    for (index, value) in pairs(var.data)
+        push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, keys(var)[index].I], value))
+    end
+end
+
+function couple_variables!(coupling_variables::Vector{DD.CouplingVariableRef}, block_id::Int, label::String, symb::Symbol, 
+        var::JuMP.Containers.SparseAxisArray{JuMP.VariableRef})
+    for (index, value) in var.data
+        push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, index], value))
     end
 end
 

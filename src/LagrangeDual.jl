@@ -108,15 +108,18 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             solve_sub_block!(m)
             subsolve_time[id] = time() - stime
 
-            @assert JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
+            status = JuMP.termination_status(m)
+            # @assert status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
 
             # We may want consider other statuses.
-            if JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
+            if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
                 try
                     objvals[id] = -JuMP.dual_objective_value(m)
                 catch e 
                     objvals[id] = -JuMP.objective_value(m)
                 end
+            else
+                @error "Unexpected solution status: $(status)"
             end
         end
 

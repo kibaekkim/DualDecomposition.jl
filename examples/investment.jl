@@ -1,6 +1,5 @@
 using JuMP, GLPK, Ipopt
 using DualDecomposition
-using MathOptInterface
 
 const DD = DualDecomposition
 
@@ -192,7 +191,7 @@ function create_nodes!(tree::DD.Tree, pt::Int)
                 DD.set_stage_objective(node, 0.0)
             else
                 @constraint(mdl, [l=1:L], x[l] == 0)
-                DD.set_stage_objective(node, B + sum( π[l] * y[l] for l in 1:L ))
+                DD.set_stage_objective(node, -(B + sum( π[l] * y[l] for l in 1:L )))
             end
             JuMP.unregister(mdl, :x)
             JuMP.unregister(mdl, :y)
@@ -229,7 +228,7 @@ algo = DD.LagrangeDual()
 coupling_variables = Vector{DD.CouplingVariableRef}()
 models = Dict{Int,JuMP.Model}()
 for (block_id, nodes) in enumerate(node_cluster)
-    subtree = DD.create_subtree!(tree, block_id, MathOptInterface.MAX_SENSE, coupling_variables, nodes)
+    subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
     set_optimizer(subtree.model, GLPK.Optimizer)
     DD.add_block_model!(algo, block_id, subtree.model)
     models[block_id] = subtree.model

@@ -126,7 +126,7 @@ mutable struct SubTree <: AbstractTree
     end
 end
 
-function create_subtree!(tree::Tree, block_id::Int, sense::MOI.OptimizationSense, coupling_variables::Vector{CouplingVariableRef}, nodes::Vector{Tuple{TreeNode,Float64}})::SubTree
+function create_subtree!(tree::Tree, block_id::Int, coupling_variables::Vector{CouplingVariableRef}, nodes::Vector{Tuple{TreeNode,Float64}})::SubTree
     subtree = SubTree(block_id)
     # add nodes to subtree
     for (node, weight) in nodes
@@ -139,7 +139,7 @@ function create_subtree!(tree::Tree, block_id::Int, sense::MOI.OptimizationSense
         subnode.treenode.stage_builder(tree, subtree, subnode) # make macro for changing variable names and constraint names to include node id
         obj += subnode.weight * subnode.obj #fix
     end
-    set_objective!(subtree, sense, obj)
+    set_objective!(subtree, MOI.MIN_SENSE, obj)
 
     # 
     for (id, subnode) in subtree.nodes

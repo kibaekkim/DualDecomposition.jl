@@ -251,7 +251,7 @@ This wraps the steps to optimize a block problem.
 function solve_sub_block!(model::JuMP.Model)
     JuMP.optimize!(model)
     # FIXME (KK): why do we need to do this?
-    # reoptimize!(model) 
+    reoptimize!(model) 
 end
 
 """

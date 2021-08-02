@@ -1,5 +1,6 @@
-using JuMP, GLPK
+using JuMP, GLPK, Ipopt
 using DualDecomposition
+using MathOptInterface
 
 const DD = DualDecomposition
 
@@ -120,13 +121,13 @@ println(objective_value(graph))
 
 # iteratively add nodes
 # root node
-function create_nodes()
-    ξ = Dict{Symbol, Float64}(:π => ones(L))
+function create_nodes()::DD.Tree
+    ξ = Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(:π => ones(L))
     tree = DD.Tree(ξ)
 
     #subproblem formulation
-    function subproblem_builder(tree::DD.SubTree, node::DD.SubTreeNode)
-        mdl = tree.model
+    function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
+        mdl = subtree.model
         x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
 
         y = @variable(mdl, y[l=1:L] >= 0, base_name="n1_y")
@@ -142,16 +143,17 @@ function create_nodes()
                 [l=1:L], y[l] - x[l] == 0 
             end
         )
-        DD.set_stage_objective(node, 0)
+        DD.set_stage_objective(node, 0.0)
 
-        JuMP.unregister(mdl, x)
-        JuMP.unregister(mdl, y)
-        JuMP.unregister(mdl, B)
+        JuMP.unregister(mdl, :x)
+        JuMP.unregister(mdl, :y)
+        JuMP.unregister(mdl, :B)
     end
 
     DD.set_stage_builder!(tree, 1, subproblem_builder)
 
     create_nodes!(tree, 1)
+    return tree
 end
 
 # child nodes
@@ -159,12 +161,12 @@ function create_nodes!(tree::DD.Tree, pt::Int)
     for scenario = 1:2^L
         prob = 1/2^L
         π = get_realization(DD.get_scenario(tree, pt)[:π], scenario)
-        ξ = Dict{Symbol, Float64}(:π => π)
+        ξ = Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(:π => π)
         id = DD.add_child!(tree, pt, ξ, prob)
 
         #subproblem formulation
-        function subproblem_builder(tree::DD.SubTree, node::DD.SubTreeNode)
-            mdl = tree.model
+        function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
+            mdl = subtree.model
             id = DD.get_id(node)
             x = @variable(mdl, x[l=1:L], Int, base_name = "n$(id)_x")
 
@@ -181,26 +183,28 @@ function create_nodes!(tree::DD.Tree, pt::Int)
             DD.set_input_variable!(node, :B, B_)
 
             π = DD.get_scenario(node)[:π]
+            pt = DD.get_parent(node)
             ρ = DD.get_scenario(tree, pt)[:π] * 0.05
             @constraint(mdl, B + sum( π[l] * x[l] - ρ[l] * y_[l] for l in 1:L) - (1+a) * B_ == b_in)
             @constraint(mdl, [l=1:L], y[l] - x[l] - y_[l] == 0)
 
             if DD.get_stage(node) < K
-                DD.set_stage_objective(node, 0)
+                DD.set_stage_objective(node, 0.0)
             else
-                @constraint(nd, [l=1:L], x[l] == 0)
-                DD.set_stage_objective(B + sum( π[l] * y[l] for l in 1:L ))
+                @constraint(mdl, [l=1:L], x[l] == 0)
+                DD.set_stage_objective(node, B + sum( π[l] * y[l] for l in 1:L ))
             end
-            JuMP.unregister(mdl, x)
-            JuMP.unregister(mdl, y)
-            JuMP.unregister(mdl, B)
-            JuMP.unregister(mdl, y_)
-            JuMP.unregister(mdl, B_)
+            JuMP.unregister(mdl, :x)
+            JuMP.unregister(mdl, :y)
+            JuMP.unregister(mdl, :B)
+            JuMP.unregister(mdl, :y_)
+            JuMP.unregister(mdl, :B_)
         end
 
         DD.set_stage_builder!(tree, id, subproblem_builder)
-
-        create_nodes!(tree, id)
+        if DD.get_stage(tree, id) < K
+            create_nodes!(tree, id)
+        end
     end
 end
 
@@ -213,3 +217,33 @@ function get_realization(ξ::Array{Float64,1}, scenario::Int)::Array{Float64,1}
     end
     return ret
 end
+
+tree = create_nodes()
+#node_cluster = DD.decomposition_not(tree)
+node_cluster = DD.decomposition_scenario(tree)
+#node_cluster = DD.decomposition_temporal(tree)
+
+# Create DualDecomposition instance.
+algo = DD.LagrangeDual()
+
+coupling_variables = Vector{DD.CouplingVariableRef}()
+models = Dict{Int,JuMP.Model}()
+for (block_id, nodes) in enumerate(node_cluster)
+    subtree = DD.create_subtree!(tree, block_id, MathOptInterface.MAX_SENSE, coupling_variables, nodes)
+    set_optimizer(subtree.model, GLPK.Optimizer)
+    DD.add_block_model!(algo, block_id, subtree.model)
+    models[block_id] = subtree.model
+    #JuMP.optimize!(subtree.model)
+end
+
+# Set nonanticipativity variables as an array of symbols.
+DD.set_coupling_variables!(algo, coupling_variables)
+
+# Lagrange master method
+LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+#LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
+
+# Solve the problem with the solver; this solver is for the underlying bundle method.
+DD.run!(algo, LM)
+
+@show DD.dual_objective_value(algo)

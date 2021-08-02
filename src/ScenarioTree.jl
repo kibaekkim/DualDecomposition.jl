@@ -7,7 +7,7 @@ abstract type AbstractTreeNode end
 
 mutable struct TreeNode <: AbstractTreeNode
     id::Int                                                                         # label of node
-    stage_builder::Union{Nothing,Function} # with input (tree::SubTree, node::SubTreeNode)
+    stage_builder::Union{Nothing,Function} # with input (tree::Tree, subtree::SubTree, node::SubTreeNode)
     parent::Int                                                                     # index of parent node
     children::Vector{Tuple{Int, Float64}}                                           # indices of child nodes
     stage::Int                                                                      # current stage
@@ -48,15 +48,15 @@ mutable struct Tree <: AbstractTree
     depth::Int                  # depth of tree
 end
 
-Tree(ξ::Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}) = Tree(Dict{1 => TreeNode(ξ)}, 1)
+Tree(ξ::Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}) = Tree(Dict{Int,TreeNode}(1 => TreeNode(ξ)), 1)
 
-function add_node!(tree::Tree, node::TreeNode)
+function add_node!(tree::AbstractTree, node::AbstractTreeNode)
     @assert !haskey(tree.nodes, get_id(node))
     id = get_id(node)
     tree.nodes[id] = node
 end
 
-function add_child!(tree::Tree, pt::Int, ξ::Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}, prob::Float64)::Float64
+function add_child!(tree::Tree, pt::Int, ξ::Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}, prob::Float64)::Int
     #   adds child node to tree.nodes[pt]
     @assert haskey(tree.nodes, pt)                                  # check if pt is valid
     stage = get_stage(tree, pt) + 1                                 # get new stage value
@@ -84,14 +84,14 @@ mutable struct SubTreeNode <: AbstractTreeNode
     weight::Float64
     in::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}    # incoming variables
     out::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # outgoing variables
-    obj::JuMP.AbstractJuMPScalar
+    obj::Union{Float64, JuMP.AbstractJuMPScalar}
     function SubTreeNode(treenode::TreeNode, weight::Float64)
         stn = new()
         stn.treenode = treenode
         stn.weight = weight
         stn.in = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
         stn.out = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
-        stn.obj = 0
+        stn.obj = 0.0
         return stn
     end
 end
@@ -111,37 +111,41 @@ function set_output_variable!(nd::SubTreeNode, symb::Symbol, var::Union{JuMP.Var
     nd.out[symb] = var
 end
 
-function set_stage_objective(nd::SubTreeNode, obj::JuMP.AbstractJuMPScalar)
+function set_stage_objective(nd::SubTreeNode, obj::Union{Float64, JuMP.AbstractJuMPScalar})
     nd.obj = obj
 end
 
 mutable struct SubTree <: AbstractTree
     block_id::Int
-    nodes::Dict{Int,TreeNode}     # list of nodes
+    nodes::Dict{Int,SubTreeNode}     # list of nodes
     model::JuMP.AbstractModel 
     parent::Int
     root::Int
     function SubTree(block_id::Int)
-        return new(block_id, Dict{Int,TreeNode}(), JuMP.Model(), 0, 1)
+        return new(block_id, Dict{Int,SubTreeNode}(), JuMP.Model(), 0, 1)
     end
 end
 
-function create_subtree!(block_id::Int, sense::MOI.OptimizationSense, coupling_variables::Vector{CouplingVariableRef}, nodes::Vector{Tuple{TreeNode,Float64}})::SubTree
+function create_subtree!(tree::Tree, block_id::Int, sense::MOI.OptimizationSense, coupling_variables::Vector{CouplingVariableRef}, nodes::Vector{Tuple{TreeNode,Float64}})::SubTree
     subtree = SubTree(block_id)
-    obj = 0
     # add nodes to subtree
     for (node, weight) in nodes
         subnode = SubTreeNode(node, weight)
         add_node!(subtree, subnode)
-        obj += subnode.weight * subnode.obj
     end
-    set_objective(subtree, sense, obj)
+
+    obj = 0 #fix
+    for (id, subnode) in subtree.nodes
+        subnode.treenode.stage_builder(tree, subtree, subnode) # make macro for changing variable names and constraint names to include node id
+        obj += subnode.weight * subnode.obj #fix
+    end
+    set_objective!(subtree, sense, obj)
+
     # 
-    for subnode in subtree.nodes
-        id = get_id(subnode)
+    for (id, subnode) in subtree.nodes
         couple_common_variables!(coupling_variables, block_id, subnode)
         parent = get_parent(subnode)
-        if parent!=0 & haskey(subtree.nodes, parent)
+        if parent!=0 && haskey(subtree.nodes, parent)
             add_links!(subtree, id, parent)
         elseif parent!=0 # assuming 1st stage node is 1
             subtree.parent = parent
@@ -150,13 +154,6 @@ function create_subtree!(block_id::Int, sense::MOI.OptimizationSense, coupling_v
         end
     end
     return subtree
-end
-
-function add_node!(tree::SubTree, node::SubTreeNode)
-    @assert !haskey(tree.nodes, get_id(node))
-    id = get_id(node)
-    tree.nodes[id] = node
-    node.treenode.stage_builder(tree, node) # make macro for changing variable names and constraint names to include node id
 end
 
 function add_links!(tree::SubTree, id::Int, pt::Int)
@@ -168,7 +165,7 @@ function add_links!(tree::SubTree, id::Int, pt::Int)
     end
 end
 
-function set_objective!(tree::SubTree, sense::MOI.OptimizationSense, obj::JuMP.AbstractJuMPScalar)
+function set_objective!(tree::SubTree, sense::MOI.OptimizationSense, obj::Union{Float64, JuMP.AbstractJuMPScalar})
     JuMP.set_objective(tree.model, sense, obj)
 end
 
@@ -187,42 +184,85 @@ function couple_incoming_variables!(coupling_variables::Vector{CouplingVariableR
     end
 end
 
-function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::String, symb::Symbol, 
+function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, symb::Symbol, 
         var::JuMP.VariableRef)
     push!(coupling_variables, CouplingVariableRef(block_id, [label, symb], var))
 end
 
-function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::String, symb::Symbol, 
+function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, symb::Symbol, 
         var::Array{JuMP.VariableRef})
     for (index, value) in pairs(var)
         push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, Tuple(index)], value))
     end
 end
 
-function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::String, symb::Symbol, 
+function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, symb::Symbol, 
         var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef})
     for (index, value) in pairs(var.data)
         push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, keys(var)[index].I], value))
     end
 end
 
-function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::String, symb::Symbol, 
+function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, symb::Symbol, 
         var::JuMP.Containers.SparseAxisArray{JuMP.VariableRef})
     for (index, value) in var.data
         push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, index], value))
     end
 end
 
+function decomposition_not(tree::Tree)::Vector{Vector{Tuple{TreeNode,Float64}}}
+    nodes = Vector{Tuple{TreeNode,Float64}}()
+    for (id, node) in tree.nodes
+        push!(nodes,(node, get_probability(node)))
+    end
+    return [nodes]
+end
 
+function decomposition_scenario(tree::Tree)::Vector{Vector{Tuple{TreeNode,Float64}}}
+    node_cluster = Vector{Vector{Tuple{TreeNode,Float64}}}()
+    for (id, node) in tree.nodes
+        if check_leaf(node)
+            nodes = Vector{Tuple{TreeNode,Float64}}()
+            prob = get_probability(node)
+            current = node
+            while true
+                push!(nodes,(current, prob))
+                pt = get_parent(current)
+                current = tree.nodes[pt]
+                if check_root(current)
+                    push!(nodes,(current, prob))
+                    break
+                end
+            end
+            push!(node_cluster, nodes)
+        end
+    end
+    return node_cluster
+end
 
-function check_leaf(node::Plasmo.OptiNode)::Bool
-    if length(node.ext[:child]) == 0
+function decomposition_temporal(tree::Tree)::Vector{Vector{Tuple{TreeNode,Float64}}}
+    node_cluster = Vector{Vector{Tuple{TreeNode,Float64}}}()
+    for (id, node) in tree.nodes
+        push!(node_cluster,[(node, get_probability(node))])
+    end
+    return node_cluster
+end
+
+function check_leaf(node::TreeNode)::Bool
+    if length(get_children(node)) == 0
         return true
     else
         return false
     end
 end
 
+function check_root(node::TreeNode)::Bool
+    if get_parent(node) == 0
+        return true
+    else
+        return false
+    end
+end
 
 
 """

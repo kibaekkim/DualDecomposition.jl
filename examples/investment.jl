@@ -2,6 +2,7 @@ using JuMP, GLPK, Ipopt
 using DualDecomposition
 
 const DD = DualDecomposition
+const parallel = DD.parallel
 
 """
 a: interest rate
@@ -151,20 +152,30 @@ end
 
 tree = create_nodes()
 #node_cluster = DD.decomposition_not(tree)
-#node_cluster = DD.decomposition_scenario(tree)
-node_cluster = DD.decomposition_temporal(tree)
+node_cluster = DD.decomposition_scenario(tree)
+#node_cluster = DD.decomposition_temporal(tree) #There is a DUAL_INFEASIBLE issue
+
+# Number of block components
+NS = length(node_cluster)
+
+# Initialize MPI
+parallel.init()
 
 # Create DualDecomposition instance.
 algo = DD.LagrangeDual()
 
+# partition scenarios into processes
+parallel.partition(NS)
+
 coupling_variables = Vector{DD.CouplingVariableRef}()
 models = Dict{Int,JuMP.Model}()
-for (block_id, nodes) in enumerate(node_cluster)
+
+for block_id in parallel.getpartition()
+    nodes = node_cluster[block_id]
     subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
     set_optimizer(subtree.model, GLPK.Optimizer)
     DD.add_block_model!(algo, block_id, subtree.model)
     models[block_id] = subtree.model
-    #JuMP.optimize!(subtree.model)
 end
 
 # Set nonanticipativity variables as an array of symbols.
@@ -177,4 +188,9 @@ LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimize
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)
 
-@show DD.dual_objective_value(algo)
+
+# Write timing outputs to files
+DD.write_all(algo)
+
+# Finalize MPI
+parallel.finalize()

@@ -55,7 +55,8 @@
         #subproblem formulation
         function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
             mdl = subtree.model
-            x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
+            #x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
+            x = @variable(mdl, x[l=1:L], base_name="n1_x")
 
             y = @variable(mdl, y[l=1:L] >= 0, base_name="n1_y")
             DD.set_output_variable!(node, :y, y)
@@ -95,7 +96,8 @@
             function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
                 mdl = subtree.model
                 id = DD.get_id(node)
-                x = @variable(mdl, x[l=1:L], Int, base_name = "n$(id)_x")
+                #x = @variable(mdl, x[l=1:L], Int, base_name = "n$(id)_x")
+                x = @variable(mdl, x[l=1:L], base_name = "n$(id)_x")
 
                 y = @variable(mdl, y[l=1:L] >= 0, base_name = "n$(id)_y")
                 DD.set_output_variable!(node, :y, y)
@@ -160,7 +162,6 @@
             set_optimizer(subtree.model, GLPK.Optimizer)
             DD.add_block_model!(algo, block_id, subtree.model)
             models[block_id] = subtree.model
-            #JuMP.optimize!(subtree.model)
         end
 
         # Set nonanticipativity variables as an array of symbols.
@@ -188,7 +189,6 @@
             set_optimizer(subtree.model, GLPK.Optimizer)
             DD.add_block_model!(algo, block_id, subtree.model)
             models[block_id] = subtree.model
-            #JuMP.optimize!(subtree.model)
         end
 
         # Set nonanticipativity variables as an array of symbols.

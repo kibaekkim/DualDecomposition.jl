@@ -108,20 +108,22 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             solve_sub_block!(m)
             subsolve_time[id] = time() - stime
 
-            @assert JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
+            status = JuMP.termination_status(m)
+            # @assert status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
 
             # We may want consider other statuses.
-            if JuMP.termination_status(m) in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
+            if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
                 try
                     objvals[id] = -JuMP.dual_objective_value(m)
                 catch e 
                     objvals[id] = -JuMP.objective_value(m)
                 end
+            else
+                @error "Unexpected solution status: $(status)"
             end
         end
 
         push!(LD.subsolve_time, subsolve_time)
-
 
         # Get subgradients
         for var in coupling_variables(LD)
@@ -129,37 +131,39 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             subgrads[var.key.block_id][index_of_λ(LD, var)] = -JuMP.value(var.ref)
         end
 
-        #get the values of all coupling variables
-        opt_coupling_val = Dict{Int,SparseVector{Float64}}()
-        coupling_ub = Dict{Int,SparseVector{Float64}}()
-        coupling_lb = Dict{Int,SparseVector{Float64}}()
-        for (id,m) in block_model(LD)
-            opt_coupling_val[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
-            coupling_ub[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
-            coupling_lb[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
-        end
-        #get variable values and bounds
-        for var in coupling_variables(LD)
-            opt_coupling_val[var.key.block_id][index_of_λ(LD, var)] = JuMP.value(var.ref)
-            if JuMP.has_lower_bound(var.ref)
-                coupling_lb[var.key.block_id][index_of_λ(LD, var)] = JuMP.lower_bound(var.ref)
-            else
-                coupling_lb[var.key.block_id][index_of_λ(LD, var)] = - Inf
-            end 
-            if JuMP.has_upper_bound(var.ref)
-                coupling_ub[var.key.block_id][index_of_λ(LD, var)] = JuMP.upper_bound(var.ref)
-            else
-                coupling_ub[var.key.block_id][index_of_λ(LD, var)] = + Inf
-            end 
-        end  
-
-        opt_coupling_val_combined = parallel.combine_dict(opt_coupling_val)
-        coupling_ub_combined = parallel.combine_dict(coupling_ub)
-        coupling_lb_combined = parallel.combine_dict(coupling_lb)
-
         #run heuristics
-        for htype in LD.heuristics
-            run!(htype, LD, opt_coupling_val_combined, coupling_ub_combined, coupling_lb_combined)
+        if length(LD.heuristics) > 0
+            #get the values of all coupling variables
+            opt_coupling_val = Dict{Int,SparseVector{Float64}}()
+            coupling_ub = Dict{Int,SparseVector{Float64}}()
+            coupling_lb = Dict{Int,SparseVector{Float64}}()
+            for (id,m) in block_model(LD)
+                opt_coupling_val[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+                coupling_ub[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+                coupling_lb[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+            end
+            #get variable values and bounds
+            for var in coupling_variables(LD)
+                opt_coupling_val[var.key.block_id][index_of_λ(LD, var)] = JuMP.value(var.ref)
+                if JuMP.has_lower_bound(var.ref)
+                    coupling_lb[var.key.block_id][index_of_λ(LD, var)] = JuMP.lower_bound(var.ref)
+                else
+                    coupling_lb[var.key.block_id][index_of_λ(LD, var)] = - Inf
+                end 
+                if JuMP.has_upper_bound(var.ref)
+                    coupling_ub[var.key.block_id][index_of_λ(LD, var)] = JuMP.upper_bound(var.ref)
+                else
+                    coupling_ub[var.key.block_id][index_of_λ(LD, var)] = + Inf
+                end 
+            end  
+
+            opt_coupling_val_combined = parallel.combine_dict(opt_coupling_val)
+            coupling_ub_combined = parallel.combine_dict(coupling_ub)
+            coupling_lb_combined = parallel.combine_dict(coupling_lb)
+
+            for htype in LD.heuristics
+                run!(htype, LD, opt_coupling_val_combined, coupling_ub_combined, coupling_lb_combined)
+            end
         end
 
         # Reset objective coefficients
@@ -246,7 +250,8 @@ This wraps the steps to optimize a block problem.
 """
 function solve_sub_block!(model::JuMP.Model)
     JuMP.optimize!(model)
-    reoptimize!(model)
+    # FIXME (KK): why do we need to do this?
+    # reoptimize!(model) 
 end
 
 """

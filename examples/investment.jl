@@ -57,7 +57,8 @@ function create_nodes()::DD.Tree
     #subproblem formulation
     function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
         mdl = subtree.model
-        x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
+        #x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
+        x = @variable(mdl, x[l=1:L], base_name="n1_x")
 
         y = @variable(mdl, y[l=1:L] >= 0, base_name="n1_y")
         DD.set_output_variable!(node, :y, y)
@@ -97,7 +98,8 @@ function create_nodes!(tree::DD.Tree, pt::Int)
         function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
             mdl = subtree.model
             id = DD.get_id(node)
-            x = @variable(mdl, x[l=1:L], Int, base_name = "n$(id)_x")
+            #x = @variable(mdl, x[l=1:L], Int, base_name = "n$(id)_x")
+            x = @variable(mdl, x[l=1:L], base_name = "n$(id)_x")
 
             y = @variable(mdl, y[l=1:L] >= 0, base_name = "n$(id)_y")
             DD.set_output_variable!(node, :y, y)
@@ -120,7 +122,7 @@ function create_nodes!(tree::DD.Tree, pt::Int)
             if DD.get_stage(node) < K
                 DD.set_stage_objective(node, 0.0)
             else
-                @constraint(mdl, [l=1:L], x[l] == 0)
+                #@constraint(mdl, [l=1:L], x[l] == 0)
                 DD.set_stage_objective(node, -(B + sum( π[l] * y[l] for l in 1:L )))
             end
             JuMP.unregister(mdl, :x)
@@ -149,8 +151,8 @@ end
 
 tree = create_nodes()
 #node_cluster = DD.decomposition_not(tree)
-node_cluster = DD.decomposition_scenario(tree)
-#node_cluster = DD.decomposition_temporal(tree)
+#node_cluster = DD.decomposition_scenario(tree)
+node_cluster = DD.decomposition_temporal(tree)
 
 # Create DualDecomposition instance.
 algo = DD.LagrangeDual()

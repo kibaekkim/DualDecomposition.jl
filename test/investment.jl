@@ -118,7 +118,7 @@
                 if DD.get_stage(node) < K
                     DD.set_stage_objective(node, 0.0)
                 else
-                    @constraint(mdl, [l=1:L], x[l] == 0)
+                    #@constraint(mdl, [l=1:L], x[l] == 0)
                     DD.set_stage_objective(node, -(B + sum( π[l] * y[l] for l in 1:L )))
                 end
                 JuMP.unregister(mdl, :x)

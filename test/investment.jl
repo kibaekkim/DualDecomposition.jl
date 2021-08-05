@@ -1,5 +1,4 @@
 @testset "investment" begin
-    const DD = DualDecomposition
 
     """
     a: interest rate

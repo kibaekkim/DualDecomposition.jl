@@ -39,11 +39,11 @@
         
                 B_k ≥ 0, ∀ k=1,…,K.
     """
-    const K = 3
-    const L = 2
-    const a = 0.01
-    const b_init = 100  # initial capital
-    const b_in = 30   # income
+    K = 3
+    L = 2
+    a = 0.01
+    b_init = 100  # initial capital
+    b_in = 30   # income
 
     # iteratively add nodes
     # root node

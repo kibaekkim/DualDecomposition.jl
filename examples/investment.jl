@@ -120,10 +120,13 @@ function create_nodes!(tree::DD.Tree, pt::Int)
             @constraint(mdl, B + sum( π[l] * x[l] - ρ[l] * y_[l] for l in 1:L) - (1+a) * B_ == b_in)
             @constraint(mdl, [l=1:L], y[l] - x[l] - y_[l] == 0)
 
+
+            #dummy bound for input variables to avoid subproblem unboundedness
+            @constraint(mdl, [l=1:L], y[l] <= 500)
+            @constraint(mdl, B <= 500)
             if DD.get_stage(node) < K
                 DD.set_stage_objective(node, 0.0)
             else
-                #@constraint(mdl, [l=1:L], x[l] == 0)
                 DD.set_stage_objective(node, -(B + sum( π[l] * y[l] for l in 1:L )))
             end
             JuMP.unregister(mdl, :x)
@@ -152,8 +155,8 @@ end
 
 tree = create_nodes()
 #node_cluster = DD.decomposition_not(tree)
-node_cluster = DD.decomposition_scenario(tree)
-#node_cluster = DD.decomposition_temporal(tree) #There is a DUAL_INFEASIBLE issue
+#node_cluster = DD.decomposition_scenario(tree)
+node_cluster = DD.decomposition_temporal(tree) #There is a DUAL_INFEASIBLE issue
 
 # Number of block components
 NS = length(node_cluster)

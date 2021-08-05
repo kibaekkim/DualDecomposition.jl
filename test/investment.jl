@@ -147,9 +147,7 @@
         return ret
     end
     tree = create_nodes()
-    #node_cluster = DD.decomposition_not(tree)
     node_cluster = DD.decomposition_scenario(tree)
-    #node_cluster = DD.decomposition_temporal(tree)
     
     @testset "ProximalMethod" begin
         # Create DualDecomposition instance.

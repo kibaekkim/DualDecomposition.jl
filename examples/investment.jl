@@ -1,9 +1,8 @@
-using JuMP, Ipopt, GLPK
+using JuMP, GLPK, Ipopt
 using DualDecomposition
-using Random
 
 const DD = DualDecomposition
-
+const parallel = DD.parallel
 
 """
 a: interest rate
@@ -11,75 +10,23 @@ a: interest rate
 ρ: unit dividend price
 
 
-K = 3 number of stages
-L = 2 number of investment vehicles
+K: number of stages
+L: number of stock types
 2^L scenarios in each stage
 2^L^(K-1)=16 scenarios in total
 ρ = 0.05 * π
 bank: interest rate 0.01
-asset1: 1.03 or 0.97
-asset2: 1.06 or 0.94
+stock1: 1.03 or 0.97
+stock2: 1.06 or 0.94
+...
 
-"""
+b_k: initial asset (if k=1) and income (else)
+B_k: money in bank
+x_{k,l}: number of stocks to buy/sell (integer)
+y_{k,l}: total stocks 
 
-function create_tree(K::Int, L::Int)::DD.Tree
-    π = ones(L)                              
-    tree = DD.Tree(π)
-    add_nodes!(K, L, tree, 1, 1)
-    return tree
-end
+deterministic model:
 
-function add_nodes!(K::Int, L::Int, tree::DD.Tree, id::Int, k::Int)
-    if k < K-1
-        ls = iterlist(L,tree.nodes[id].ξ)
-        for π in ls
-            DD.addchild!(tree, id, π)
-            childid = length(tree.nodes)
-            add_nodes!(K, L, tree, childid, k+1)
-        end
-    elseif k == K-1
-        ls = iterlist(L,tree.nodes[id].ξ)
-        for π in ls
-            DD.addchild!(tree, id, π)
-        end
-    end
-end
-
-function iterlist(L::Int, π::Array{Float64})::Array{Array{Float64}}
-    # generates all combinations of up and down scenarios
-    ls = [Float64[] for _ in 1:2^L]
-    ii = 1
-
-    function foo(L::Int, l::Int, arr::Vector{Float64})
-        up = (1.0 + 0.03 * l) * π[l]
-        dn = (1.0 - 0.03 * l) * π[l]
-
-        if l < L
-            arr1 = copy(arr)
-            arr1[l] = up
-            foo(L, l+1, arr1)
-
-            arr2 = copy(arr)
-            arr2[l] = dn
-            foo(L, l+1, arr2)
-        else
-            arr1 = copy(arr)
-            arr1[l] = up
-            ls[ii] = arr1
-            ii+=1
-
-            arr2 = copy(arr)
-            arr2[l] = dn
-            ls[ii] = arr2
-            ii+=1
-        end
-    end
-
-    foo(L, 1, Array{Float64}(undef, L))
-    return ls
-end
-
-"""
     max     B_K+∑_{l=1}^{L}π_{K,l}y_{K,l}
 
     s.t.    B_1+∑_{l=1}^{L}π_{1,l}x_{1,l} = b_1
@@ -99,103 +46,154 @@ end
 const K = 3
 const L = 2
 const a = 0.01
-const b1 = 100  # initial capital
-const b2 = 30   # income
+const b_init = 100  # initial capital
+const b_in = 30   # income
 
-function create_scenario_model(K::Int, L::Int, tree::DD.Tree, id::Int)
-    hist = DD.get_history(tree, id)
-    m = Model(GLPK.Optimizer) 
-    #@variable(m, x[1:K,1:L], integer=true)
-    @variable(m, x[1:K,1:L])
-    @variable(m, y[1:K,1:L]>=0)
-    @variable(m, B[1:K]>=0)
+# iteratively add nodes
+# root node
+function create_nodes()::DD.Tree
+    ξ = Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(:π => ones(L))
+    tree = DD.Tree(ξ)
 
-    π = tree.nodes[1].ξ
+    #subproblem formulation
+    function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
+        mdl = subtree.model
+        #x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
+        x = @variable(mdl, x[l=1:L], base_name="n1_x")
 
-    @constraint(m, B[1] + sum( π[l] * x[1,l] for l in 1:L) == b1)
+        y = @variable(mdl, y[l=1:L] >= 0, base_name="n1_y")
+        DD.set_output_variable!(node, :y, y)
 
-    for l in 1:L
-        @constraint(m, y[1,l]-x[1,l]==0)
-    end
+        B = @variable(mdl, B >= 0, base_name="n1_B")
+        DD.set_output_variable!(node, :B, B)
 
-    for k = 2:K
-        π = tree.nodes[hist[k]].ξ
-        ρ = tree.nodes[hist[k-1]].ξ * 0.05
-
-        @constraint(m, B[k] + sum( π[l] * x[k,l] - ρ[l] * y[k-1,l] for l in 1:L)
-            - (1+a) * B[k-1] == b2)
-        for l in 1:L
-            @constraint(m, y[k,l]-x[k,l]-y[k-1,l]==0)
-        end
-    end
-    for l in 1:L
-        @constraint(m, x[K,l]==0)
-    end
-    π = tree.nodes[id].ξ
-    @objective(m, Min, - (B[K] + sum( π[l] * y[K,l] for l in 1:L ))/(2^L)^(K-1) )
-    return m
-end
-
-"""
-
-The main computation section
-
-"""
-function main_comp()
-    # generate tree data structure
-    tree = create_tree(K,L)
-
-    # Create DualDecomposition instance.
-    algo = DD.LagrangeDual()
-        
-    # Lagrange master method
-    LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
-
-    # compute dual decomposition method
-    dual_decomp!(L, tree, algo, LM)
-end
-
-
-function dual_decomp!(L::Int, tree::DD.Tree, algo::DD.LagrangeDual, LM::DD.AbstractLagrangeMaster)
-
-    # Add Lagrange dual problem for each scenario s.
-    nodelist = DD.get_stage_id(tree)
-    leafdict = DD.leaf2block(nodelist[K])
-    models = Dict{Int,JuMP.Model}(id => create_scenario_model(K,L,tree,id) for id in nodelist[K])
-    for id in nodelist[K]
-        DD.add_block_model!(algo, leafdict[id], models[id])
-    end
-
-    coupling_variables = Vector{DD.CouplingVariableRef}()
-    for k in 1:K-1
-        for root in nodelist[k]
-            leaves = DD.get_future(tree, root)
-            for id in leaves
-                model = models[id]
-                yref = model[:y]
-                for l in 1:L
-                    push!(coupling_variables, DD.CouplingVariableRef(leafdict[id], [root, l], yref[k, l]))
-                end
-                Bref = model[:B]
-                push!(coupling_variables, DD.CouplingVariableRef(leafdict[id], [root, L+1], Bref[k]))
+        π = DD.get_scenario(node)[:π]
+        @constraints(mdl, 
+            begin
+                B + sum( π[l] * x[l] for l in 1:L) == b_init
+                [l=1:L], y[l] - x[l] == 0 
             end
-        end
-    end
-    # dummy coupling variables
-    for id in nodelist[K]
-        model = models[id]
-        yref = model[:y]
-        for l in 1:L
-            push!(coupling_variables, DD.CouplingVariableRef(leafdict[id], [id, l], yref[K, l]))
-        end
-        Bref = model[:B]
-        push!(coupling_variables, DD.CouplingVariableRef(leafdict[id], [id, L+1], Bref[K]))
+        )
+        DD.set_stage_objective(node, 0.0)
+
+        JuMP.unregister(mdl, :x)
+        JuMP.unregister(mdl, :y)
+        JuMP.unregister(mdl, :B)
     end
 
-    # Set nonanticipativity variables as an array of symbols.
-    DD.set_coupling_variables!(algo, coupling_variables)
+    DD.set_stage_builder!(tree, 1, subproblem_builder)
 
-    # Solve the problem with the solver; this solver is for the underlying bundle method.
-    DD.run!(algo, LM)
+    create_nodes!(tree, 1)
+    return tree
 end
 
+# child nodes
+function create_nodes!(tree::DD.Tree, pt::Int)
+    for scenario = 1:2^L
+        prob = 1/2^L
+        π = get_realization(DD.get_scenario(tree, pt)[:π], scenario)
+        ξ = Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(:π => π)
+        id = DD.add_child!(tree, pt, ξ, prob)
+
+        #subproblem formulation
+        function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
+            mdl = subtree.model
+            id = DD.get_id(node)
+            #x = @variable(mdl, x[l=1:L], Int, base_name = "n$(id)_x")
+            x = @variable(mdl, x[l=1:L], base_name = "n$(id)_x")
+
+            y = @variable(mdl, y[l=1:L] >= 0, base_name = "n$(id)_y")
+            DD.set_output_variable!(node, :y, y)
+
+            B = @variable(mdl, B >= 0, base_name = "n$(id)_B")
+            DD.set_output_variable!(node, :B, B)
+
+            y_ = @variable(mdl, y_[l=1:L] >= 0, base_name = "n$(id)_y_")
+            DD.set_input_variable!(node, :y, y_)
+
+            B_ = @variable(mdl, B_ >= 0, base_name = "n$(id)_B_")
+            DD.set_input_variable!(node, :B, B_)
+
+            π = DD.get_scenario(node)[:π]
+            pt = DD.get_parent(node)
+            ρ = DD.get_scenario(tree, pt)[:π] * 0.05
+            @constraint(mdl, B + sum( π[l] * x[l] - ρ[l] * y_[l] for l in 1:L) - (1+a) * B_ == b_in)
+            @constraint(mdl, [l=1:L], y[l] - x[l] - y_[l] == 0)
+
+
+            #dummy bound for input variables to avoid subproblem unboundedness
+            @constraint(mdl, [l=1:L], y[l] <= 500)
+            @constraint(mdl, B <= 500)
+            if DD.get_stage(node) < K
+                DD.set_stage_objective(node, 0.0)
+            else
+                DD.set_stage_objective(node, -(B + sum( π[l] * y[l] for l in 1:L )))
+            end
+            JuMP.unregister(mdl, :x)
+            JuMP.unregister(mdl, :y)
+            JuMP.unregister(mdl, :B)
+            JuMP.unregister(mdl, :y_)
+            JuMP.unregister(mdl, :B_)
+        end
+
+        DD.set_stage_builder!(tree, id, subproblem_builder)
+        if DD.get_stage(tree, id) < K
+            create_nodes!(tree, id)
+        end
+    end
+end
+
+# construct realization event
+function get_realization(ξ::Array{Float64,1}, scenario::Int)::Array{Float64,1}
+    ret = ones(L)
+    multipliers = digits(scenario - 1, base=2, pad=L)*2 - ones(L)
+    for l = 1:L
+        ret[l] = ξ[l] * (1 + multipliers[l] * l * 0.03)
+    end
+    return ret
+end
+
+tree = create_nodes()
+#node_cluster = DD.decomposition_not(tree)
+#node_cluster = DD.decomposition_scenario(tree)
+node_cluster = DD.decomposition_temporal(tree) #There is a DUAL_INFEASIBLE issue
+
+# Number of block components
+NS = length(node_cluster)
+
+# Initialize MPI
+parallel.init()
+
+# Create DualDecomposition instance.
+algo = DD.LagrangeDual()
+
+# partition scenarios into processes
+parallel.partition(NS)
+
+coupling_variables = Vector{DD.CouplingVariableRef}()
+models = Dict{Int,JuMP.Model}()
+
+for block_id in parallel.getpartition()
+    nodes = node_cluster[block_id]
+    subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
+    set_optimizer(subtree.model, GLPK.Optimizer)
+    DD.add_block_model!(algo, block_id, subtree.model)
+    models[block_id] = subtree.model
+end
+
+# Set nonanticipativity variables as an array of symbols.
+DD.set_coupling_variables!(algo, coupling_variables)
+
+# Lagrange master method
+LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+#LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
+
+# Solve the problem with the solver; this solver is for the underlying bundle method.
+DD.run!(algo, LM)
+
+
+# Write timing outputs to files
+DD.write_all(algo)
+
+# Finalize MPI
+parallel.finalize()

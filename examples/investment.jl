@@ -122,8 +122,8 @@ function create_nodes!(tree::DD.Tree, pt::Int)
 
 
             #dummy bound for input variables to avoid subproblem unboundedness
-            @constraint(mdl, [l=1:L], y[l] <= 500)
-            @constraint(mdl, B <= 500)
+            @constraint(mdl, [l=1:L], y_[l] <= 500)
+            @constraint(mdl, B_ <= 500)
             if DD.get_stage(node) < K
                 DD.set_stage_objective(node, 0.0)
             else

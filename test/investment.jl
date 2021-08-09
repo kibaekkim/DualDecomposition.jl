@@ -201,4 +201,32 @@
         @show DD.dual_solution(algo)
         @test isapprox(DD.dual_objective_value(algo), -171.75, rtol=1e-3)
     end
+
+    @testset "TemporalDecomposition" begin
+        node_cluster = DD.decomposition_temporal(tree)
+        # Create DualDecomposition instance.
+        algo = DD.LagrangeDual()
+
+        coupling_variables = Vector{DD.CouplingVariableRef}()
+        models = Dict{Int,JuMP.Model}()
+        for (block_id, nodes) in enumerate(node_cluster)
+            subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
+            set_optimizer(subtree.model, GLPK.Optimizer)
+            DD.add_block_model!(algo, block_id, subtree.model)
+            models[block_id] = subtree.model
+        end
+
+        # Set nonanticipativity variables as an array of symbols.
+        DD.set_coupling_variables!(algo, coupling_variables)
+
+        # Lagrange master method
+        LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+
+        # Solve the problem with the solver; this solver is for the underlying bundle method.
+        DD.run!(algo, LM)
+
+        @show DD.dual_objective_value(algo)
+        @show DD.dual_solution(algo)
+        @test isapprox(DD.dual_objective_value(algo), -171.75, rtol=1e-3)
+    end
 end

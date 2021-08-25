@@ -58,8 +58,8 @@ function create_nodes()::DD.Tree
     #subproblem formulation
     function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
         mdl = subtree.model
-        #x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
-        x = @variable(mdl, x[l=1:L], base_name="n1_x")
+        x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
+        #x = @variable(mdl, x[l=1:L], base_name="n1_x")
 
         y = @variable(mdl, y[l=1:L] >= 0, base_name="n1_y")
         DD.set_output_variable!(node, :y, y)
@@ -155,8 +155,8 @@ end
 
 tree = create_nodes()
 #node_cluster = DD.decomposition_not(tree)
-#node_cluster = DD.decomposition_scenario(tree)
-node_cluster = DD.decomposition_temporal(tree) #There is a DUAL_INFEASIBLE issue
+node_cluster = DD.decomposition_scenario(tree)
+#node_cluster = DD.decomposition_temporal(tree) #There is a DUAL_INFEASIBLE issue
 
 # Number of block components
 NS = length(node_cluster)

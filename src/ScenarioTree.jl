@@ -68,7 +68,7 @@ abstract type AbstractTree end
 """
     Tree
 
-Tree keeps information of tree nodes. Mainly for data keeping.
+Tree keeps information of tree nodes.
 
     - `nodes`: list of nodes
 """
@@ -76,6 +76,8 @@ Tree keeps information of tree nodes. Mainly for data keeping.
 mutable struct Tree <: AbstractTree
     nodes::Dict{Int,TreeNode}
 end
+
+Tree() = Tree(Dict{Int,TreeNode}())
 
 Tree(ξ::Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}) = Tree(Dict{Int,TreeNode}(1 => TreeNode(ξ)))
 

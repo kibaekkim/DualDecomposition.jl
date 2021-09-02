@@ -109,10 +109,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             subsolve_time[id] = time() - stime
 
             status = JuMP.termination_status(m)
-            # @assert status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
 
             # We may want consider other statuses.
-            if status in [MOI.OPTIMAL, MOI.ALMOST_OPTIMAL, MOI.LOCALLY_SOLVED]
+            if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
                 try
                     objvals[id] = -JuMP.dual_objective_value(m)
                 catch e 

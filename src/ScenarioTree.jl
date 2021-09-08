@@ -344,8 +344,8 @@ outputs the entire tree
 """
 
 
-function (decomposition_not(tree::Tree{T}):: Vector{Vector{Tuple{T,Float64}}}) where {T<:AbstractTreeNode}
-    nodes = Vector{Tuple{T,Float64}}()
+function decomposition_not(tree::Tree{TreeNode}):: Vector{Vector{Tuple{TreeNode,Float64}}}
+    nodes = Vector{Tuple{TreeNode,Float64}}()
     for (id, node) in tree.nodes
         push!(nodes,(node, get_probability(node)))
     end
@@ -361,11 +361,11 @@ outputs the scenario decomposition at each leaf nodes
     - `tree`: Tree
 """
 
-function (decomposition_scenario(tree::Tree{T}):: Vector{Vector{Tuple{T,Float64}}}) where {T<:AbstractTreeNode}
-    node_cluster = Vector{Vector{Tuple{T,Float64}}}()
+function decomposition_scenario(tree::Tree{TreeNode}):: Vector{Vector{Tuple{TreeNode,Float64}}}
+    node_cluster = Vector{Vector{Tuple{TreeNode,Float64}}}()
     for (id, node) in tree.nodes
         if check_leaf(node)
-            nodes = Vector{Tuple{T,Float64}}()
+            nodes = Vector{Tuple{TreeNode,Float64}}()
             prob = get_probability(node)
             current = node
             while true
@@ -393,8 +393,8 @@ outputs the temporal decomposition at each nodes
 """
 #need fix
 
-function (decomposition_temporal(tree::Tree{T}):: Vector{Vector{Tuple{T,Float64}}}) where {T<:AbstractTreeNode}
-    node_cluster = Vector{Vector{Tuple{T,Float64}}}()
+function decomposition_temporal(tree::Tree{TreeNode}):: Vector{Vector{Tuple{TreeNode,Float64}}}
+    node_cluster = Vector{Vector{Tuple{TreeNode,Float64}}}()
     for (id, node) in tree.nodes
         push!(node_cluster,[(node, get_probability(node))])
     end

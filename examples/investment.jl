@@ -74,7 +74,6 @@ function create_nodes()::DD.Tree
                 [l=1:L], y[l] - x[l] == 0 
             end
         )
-        DD.set_stage_objective(node, 0.0)
 
         JuMP.unregister(mdl, :x)
         JuMP.unregister(mdl, :y)
@@ -101,6 +100,7 @@ function create_nodes!(tree::DD.Tree, pt::Int)
             id = DD.get_id(node)
             #x = @variable(mdl, x[l=1:L], Int, base_name = "n$(id)_x")
             x = @variable(mdl, x[l=1:L], base_name = "n$(id)_x")
+            DD.set_control_variable!(node, :x, x)
 
             y = @variable(mdl, y[l=1:L] >= 0, base_name = "n$(id)_y")
             DD.set_output_variable!(node, :y, y)
@@ -124,10 +124,11 @@ function create_nodes!(tree::DD.Tree, pt::Int)
             #dummy bound for input variables to avoid subproblem unboundedness
             @constraint(mdl, [l=1:L], y_[l] <= 500)
             @constraint(mdl, B_ <= 500)
-            if DD.get_stage(node) < K
-                DD.set_stage_objective(node, 0.0)
-            else
-                DD.set_stage_objective(node, -(B + sum( π[l] * y[l] for l in 1:L )))
+            if DD.get_stage(node) == K
+                DD.set_cost_coefficient(node, B, -1.0)
+                for l in 1:L
+                    DD.set_cost_coefficient(node, y[l], -π[l])
+                end
             end
             JuMP.unregister(mdl, :x)
             JuMP.unregister(mdl, :y)

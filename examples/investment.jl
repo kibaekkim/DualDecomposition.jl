@@ -58,8 +58,9 @@ function create_nodes()::DD.Tree
     #subproblem formulation
     function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
         mdl = subtree.model
-        x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
-        #x = @variable(mdl, x[l=1:L], base_name="n1_x")
+        #x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
+        x = @variable(mdl, x[l=1:L], base_name="n1_x")
+        DD.set_control_variable!(node, :x, x)
 
         y = @variable(mdl, y[l=1:L] >= 0, base_name="n1_y")
         DD.set_output_variable!(node, :y, y)

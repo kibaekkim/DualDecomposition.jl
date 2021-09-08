@@ -152,7 +152,7 @@ mutable struct SubTreeNode <: AbstractTreeNode
     out::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # outgoing variables
     control::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # control variables
     cost::Dict{JuMP.VariableRef, Float64}
-    function SubTreeNode(treenode::TreeNode, weight::Float64)
+    function SubTreeNode(treenode::AbstractTreeNode, weight::Float64)
         stn = new()
         stn.treenode = treenode
         stn.weight = weight

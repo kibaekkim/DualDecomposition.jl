@@ -24,6 +24,7 @@ Tree node stores information of stage problem
 mutable struct TreeNode <: AbstractTreeNode
     id::Int
     stage_builder::Union{Nothing,Function}
+    coupling_variables::Vector{CouplingVariableRef}
     parent::Int
     children::Vector{Tuple{Int, Float64}}
     stage::Int
@@ -35,6 +36,7 @@ mutable struct TreeNode <: AbstractTreeNode
         tn = new()
         tn.id = id
         tn.stage_builder = nothing
+        tn.coupling_variables = []
         tn.parent = parent
         tn.children = Vector{Tuple{Int, Float64}}()
         tn.stage = stage
@@ -420,3 +422,16 @@ function check_root(node::AbstractTreeNode)::Bool
 end
 
 check_root(node::SubTreeNode) = check_root(node.treenode)
+
+function set_coupling_variables!(LD::AbstractLagrangeDual, variables::Vector{CouplingVariableRef}, tree::Tree)
+    set_coupling_variables!(LD, variables)
+    for variable in variables
+        label = variable.key.coupling_id[1]
+        node = tree.nodes[label]
+        add_coupling_variable!(node, variable)
+    end
+end
+
+function add_coupling_variable!(node::AbstractTreeNode, variable::CouplingVariableRef)
+    push!(node.coupling_variables, variable)
+end

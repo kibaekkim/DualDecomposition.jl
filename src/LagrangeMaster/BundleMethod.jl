@@ -27,7 +27,7 @@ mutable struct BundleMaster <: AbstractLagrangeMaster
     end
 end
 
-function load!(method::BundleMaster, num_coupling_variables::Int, num_blocks::Int, eval_function::Function, init_sol::Vector{Float64})
+function load!(method::BundleMaster, num_coupling_variables::Int, num_blocks::Int, eval_function::Function, init_sol::Vector{Float64}, bound::Float64)
     method.inner = method.constructor(num_coupling_variables, num_blocks, eval_function; init = init_sol, params = method.params)
 
     # Set optimizer to bundle method
@@ -38,6 +38,7 @@ function load!(method::BundleMaster, num_coupling_variables::Int, num_blocks::In
     BM.build_bundle_model!(method.inner)
 
     # set objective limit
+    method.obj_limit = bound
     BM.set_obj_limit(method.inner, -method.obj_limit)
 end
 

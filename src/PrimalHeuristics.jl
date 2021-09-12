@@ -31,7 +31,7 @@ function run!(::Type{RoundingHeuristic}, LD::AbstractLagrangeDual, val, ub, lb)
     else
         new_primal_solution = parallel.bcast(nothing)
     end 
-    
+
     #fix variables with new primal solution and enforce integrality through rounding
     for variables in LD.block_model.coupling_variables
         if JuMP.is_integer(variables.ref) || JuMP.is_binary(variables.ref)
@@ -48,6 +48,7 @@ function run!(::Type{RoundingHeuristic}, LD::AbstractLagrangeDual, val, ub, lb)
     for (id,m) in block_model(LD)
         JuMP.optimize!(m)
         if ! (JuMP.termination_status(m)  in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED])
+            println("primal status: ", JuMP.termination_status(m))
             cur_primal_bound = + Inf 
             break 
         else

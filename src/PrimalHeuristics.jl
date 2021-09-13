@@ -48,7 +48,6 @@ function run!(::Type{RoundingHeuristic}, LD::AbstractLagrangeDual, val, ub, lb)
     for (id,m) in block_model(LD)
         JuMP.optimize!(m)
         if ! (JuMP.termination_status(m)  in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED])
-            println("primal status: ", JuMP.termination_status(m))
             cur_primal_bound = + Inf 
             break 
         else

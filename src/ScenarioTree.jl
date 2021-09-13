@@ -154,6 +154,7 @@ mutable struct SubTreeNode <: AbstractTreeNode
     out::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # outgoing variables
     control::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # control variables
     cost::Dict{JuMP.VariableRef, Float64}
+    sol::Dict{Any, Any}
     function SubTreeNode(treenode::AbstractTreeNode, weight::Float64)
         stn = new()
         stn.treenode = treenode
@@ -162,6 +163,8 @@ mutable struct SubTreeNode <: AbstractTreeNode
         stn.out = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
         stn.control = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
         stn.cost = Dict{JuMP.VariableRef, Float64}()
+
+        stn.sol = Dict{Any, Any}()
         return stn
     end
 end
@@ -207,8 +210,9 @@ mutable struct SubTree <: AbstractTree
     model::JuMP.AbstractModel 
     parent::Int
     root::Int
+    sol::Dict{Any,Any}
     function SubTree(block_id::Int)
-        return new(block_id, Dict{Int,SubTreeNode}(), JuMP.Model(), 0, 1)
+        return new(block_id, Dict{Int,SubTreeNode}(), JuMP.Model(), 0, 1, Dict())
     end
 end
 

@@ -433,5 +433,9 @@ function set_coupling_variables!(LD::AbstractLagrangeDual, variables::Vector{Cou
 end
 
 function add_coupling_variable!(node::AbstractTreeNode, coupling_id::Any, variable::CouplingVariableRef)
-    push!(node.coupling_variables[coupling_id], variable)
+    if haskey(node.coupling_variables, coupling_id)
+        push!(node.coupling_variables[coupling_id], variable)
+    else
+        node.coupling_variables[coupling_id] = [variable]
+    end
 end

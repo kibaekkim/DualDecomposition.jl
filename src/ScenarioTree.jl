@@ -36,7 +36,7 @@ mutable struct TreeNode <: AbstractTreeNode
         tn = new()
         tn.id = id
         tn.stage_builder = nothing
-        tn.coupling_variables = []
+        tn.coupling_variables = Dict{Any,Vector{DD.CouplingVariableRef}}()
         tn.parent = parent
         tn.children = Vector{Tuple{Int, Float64}}()
         tn.stage = stage

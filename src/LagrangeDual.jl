@@ -89,6 +89,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         # broadcast λ
         if parallel.is_root()
+            println(λ)
             parallel.bcast(λ)
         end
 

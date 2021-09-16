@@ -122,7 +122,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
                     objvals[id] = -JuMP.objective_value(m)
                 end
             else
-                JuMP.print(m)
+                open("model$(id).lp", "w") do f
+                    print(f, m)
+                end
                 @error "Unexpected solution status: $(status)"
             end
         end

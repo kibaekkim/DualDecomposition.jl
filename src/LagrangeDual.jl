@@ -174,7 +174,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             for htype in LD.heuristics
                 run!(htype, LD, opt_coupling_val_combined, coupling_ub_combined, coupling_lb_combined)
             end
-            if !isnothing(LD.dh) && arallel.is_root()
+            if !isnothing(LD.dh) && parallel.is_root()
                 write_line!(LD.block_model.primal_bound, LD.dh, LD.dh.primal_value)
             end
         end

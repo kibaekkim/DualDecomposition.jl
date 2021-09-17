@@ -93,7 +93,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         if !isnothing(LD.dh)
             LD.dh.iter += 1
-            write_line!(λ, [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.lagrange_value)
+            write_line!(λ, [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.dh.lagrange_value)
         end
 
         # broadcast λ

@@ -17,6 +17,8 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
 
+    dh::Union{Nothing, DataHelper}
+
     function LagrangeDual()
         LD = new()
         LD.block_model = BlockModel()
@@ -26,6 +28,8 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
         LD.subcomm_time = []
         LD.subobj_value = []
         LD.master_time = []
+
+        LD.dh = Nothing
         
         return LD
     end
@@ -89,7 +93,6 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         # broadcast λ
         if parallel.is_root()
-            println(λ)
             parallel.bcast(λ)
         end
 
@@ -171,6 +174,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             for htype in LD.heuristics
                 run!(htype, LD, opt_coupling_val_combined, coupling_ub_combined, coupling_lb_combined)
             end
+            if !isnothing(LD.dh) && arallel.is_root()
+                write_line!(LD.block_model.primal_bound, LD.dh, LD.dh.primal_value)
+            end
         end
 
         # Reset objective coefficients
@@ -215,6 +221,10 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         # get dual objective value
         LD.block_model.dual_bound = get_objective(LM)
+
+        if !isnothing(LD.dh)
+            write_line!(LD.block_model.dual_bound, LD.dh, LD.dh.dual_value)
+        end
     
         # get dual solution
         LD.block_model.dual_solution = get_solution(LM)

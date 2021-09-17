@@ -217,7 +217,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
     if parallel.is_root()
         if !isnothing(LD.dh)
-            print(LD.dh.lagrange_value, "Node $(dh.BnBNode)")
+            print(LD.dh.lagrange_value, "Node $(LD.dh.BnBNode)")
             for var in LD.block_model.coupling_variables
                 coupling_id = var.key.coupling_id
                 print(io, ", ")

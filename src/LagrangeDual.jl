@@ -29,7 +29,7 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
         LD.subobj_value = []
         LD.master_time = []
 
-        LD.dh = Nothing
+        LD.dh = nothing
         
         return LD
     end

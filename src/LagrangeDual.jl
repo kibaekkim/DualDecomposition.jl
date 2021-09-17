@@ -91,6 +91,10 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
     function solveLagrangeDual(λ::Array{Float64,1})
         @assert length(λ) == num_all_coupling_variables
 
+        if !isnothing(LD.dh)
+            LD.dh.iter += 1
+        end
+
         # broadcast λ
         if parallel.is_root()
             parallel.bcast(λ)
@@ -195,6 +199,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
                 objvals_vec[k] = v
             end
             push!(LD.subobj_value, sum(objvals_vec))
+            if !isnothing(LD.dh)
+                write_line!(get_objective(LM), LD.dh, LD.dh.dual_value)
+            end
         end
 
         subgrads_combined = parallel.combine_dict(subgrads)
@@ -221,10 +228,6 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         # get dual objective value
         LD.block_model.dual_bound = get_objective(LM)
-
-        if !isnothing(LD.dh)
-            write_line!(LD.block_model.dual_bound, LD.dh, LD.dh.dual_value)
-        end
     
         # get dual solution
         LD.block_model.dual_solution = get_solution(LM)

@@ -54,7 +54,7 @@ mutable struct DataHelper
 
     dual_value::Union{Nothing,IOStream}
     primal_value::Union{Nothing,IOStream}
-    
+
     function DataHelper(dir = ".")
         dh = new()
         dh.dir = dir
@@ -88,11 +88,9 @@ function write_line!(v::Dict{Any,Any}, keys::Vector{Any}, dh::DataHelper, io::IO
 end
 
 function close_all(dh::DataHelper)
-    close(dh.subsolve_time)
     
     if parallel.is_root()
-        close(dh.subcomm_time)
-        close(dh.subobj_value)
-        close(dh.master_time)
+        close(dual_value)
+        close(dh.primal_value)
     end
 end

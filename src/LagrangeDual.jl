@@ -220,10 +220,10 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             print(LD.dh.lagrange_value, "Node $(LD.dh.BnBNode)")
             for var in LD.block_model.coupling_variables
                 coupling_id = var.key.coupling_id
-                print(io, ", ")
-                print(io, var)
+                print(LD.dh.lagrange_value, ", ")
+                print(LD.dh.lagrange_value, var)
             end
-            print(io, "\n")
+            print(LD.dh.lagrange_value, "\n")
         end
         load!(LM, num_all_coupling_variables, num_all_blocks, solveLagrangeDual, initial_λ, bound)
     

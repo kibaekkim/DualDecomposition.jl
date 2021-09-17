@@ -55,6 +55,8 @@ mutable struct DataHelper
     subobj_values::Union{Nothing,IOStream}
     primal_value::Union{Nothing,IOStream}
 
+    lagrange_value::Union{Nothing,IOStream}
+
     function DataHelper(dir = ".")
         dh = new()
         dh.dir = dir
@@ -62,8 +64,9 @@ mutable struct DataHelper
         dh.iter = 0
 
         if parallel.is_root()
-            dh.subobj_values = open("$(dir)/dual_value.txt", "a")
+            dh.subobj_values = open("$(dir)/subobj_values.txt", "a")
             dh.primal_value = open("$(dir)/primal_value.txt", "a")
+            dh.lagrange_value = open("$(dir)/lagrange_value.txt", "a")
         else
             dh.dual_value = nothing
             dh.primal_value = nothing
@@ -79,7 +82,7 @@ function write_line!(v::Any, dh::DataHelper, io::IOStream)
 end
 
 function write_line!(v::Dict{<:Any,<:Any}, keys::Vector{<:Any}, dh::DataHelper, io::IOStream)
-    print(io, "Iter $(dh.iter), ")
+    print(io, "Iter $(dh.iter)")
     for key in keys
         print(io, ", ")
         print(io, v[key])
@@ -90,7 +93,8 @@ end
 function close_all(dh::DataHelper)
     
     if parallel.is_root()
-        close(subobj_values)
+        close(dh.subobj_values)
         close(dh.primal_value)
+        close(dh.lagrange_value)
     end
 end

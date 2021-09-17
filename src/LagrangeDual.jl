@@ -93,6 +93,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         if !isnothing(LD.dh)
             LD.dh.iter += 1
+            write_line!(λ, [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.lagrange_value)
         end
 
         # broadcast λ
@@ -215,6 +216,15 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
     end
 
     if parallel.is_root()
+        if !isnothing(LD.dh)
+            print(LD.dh.lagrange_value, "Node $(dh.BnBNode)")
+            for var in LD.block_model.coupling_variables
+                coupling_id = var.key.coupling_id
+                print(io, ", ")
+                print(io, var)
+            end
+            print(io, "\n")
+        end
         load!(LM, num_all_coupling_variables, num_all_blocks, solveLagrangeDual, initial_λ, bound)
     
         # Add bounding constraints to the Lagrangian master

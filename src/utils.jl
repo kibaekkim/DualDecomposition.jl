@@ -56,12 +56,18 @@ mutable struct DataHelper
     primal_value::Union{Nothing,IOStream}
 
     lagrange_value::Union{Nothing,IOStream}
+    sub_solution::Dict{Int,IOStream}
 
     function DataHelper(dir = ".")
         dh = new()
         dh.dir = dir
         dh.BnBNode = 0
         dh.iter = 0
+
+        dh.sub_solution = Dict{Int, IOStream}()
+        for block_id in parallel.getpartition()
+            dh.sub_solution[block_id] = open("$(dir)/sub_solution.csv", "a")
+        end
 
         if parallel.is_root()
             dh.subobj_values = open("$(dir)/subobj_values.csv", "a")
@@ -99,11 +105,26 @@ function write_line!(v::Vector{<:Any}, keys::Vector{Int}, dh::DataHelper, io::IO
     print(io, "\n")
 end
 
+function write_line!(v::SparseVector, keys::Vector{Int}, dh::DataHelper, io::IOStream)
+    print(io, "Iter $(dh.iter)")
+    for key in keys
+        try
+            print(io, ", $(v[key])")
+        catch
+            print(io, ", ")
+        end
+    end
+    print(io, "\n")
+end
+
 function close_all(dh::DataHelper)
     
     if parallel.is_root()
         close(dh.subobj_values)
         close(dh.primal_value)
         close(dh.lagrange_value)
+    end
+    for block_id in parallel.getpartition()
+        close(dh.sub_solution[block_id])
     end
 end

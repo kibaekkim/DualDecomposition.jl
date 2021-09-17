@@ -93,7 +93,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         if !isnothing(LD.dh)
             LD.dh.iter += 1
-            write_line!(λ, [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.dh.lagrange_value)
+            if parallel.is_root()
+                write_line!(λ, [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.dh.lagrange_value)
+            end
         end
 
         # broadcast λ
@@ -144,6 +146,12 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         for var in coupling_variables(LD)
             # @assert has_block_model(LD, var.key.block_id)
             subgrads[var.key.block_id][index_of_λ(LD, var)] = -JuMP.value(var.ref)
+        end
+
+        if !isnothing(LD.dh)
+            for block_id in parallel.getpartition()
+                write_line!(subgrads[block_id], [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.dh.sub_solution[block_id])
+            end
         end
 
         #run heuristics
@@ -213,6 +221,18 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         end
 
         return objvals_vec, subgrads_combined
+    end
+
+    if !isnothing(LD.dh)
+        for block_id in parallel.getpartition()
+            print(LD.dh.sub_solution[block_id], "Node $(LD.dh.BnBNode)")
+            for var in LD.block_model.coupling_variables
+                coupling_id = var.key.coupling_id
+                print(LD.dh.lsub_solution[block_id], ", ")
+                print(LD.dh.sub_solution[block_id], coupling_id)
+            end
+            print(LD.dh.lagrange_value, "\n")
+        end
     end
 
     if parallel.is_root()

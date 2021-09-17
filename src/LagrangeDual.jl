@@ -240,6 +240,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             print(LD.dh.lagrange_value, "Node $(LD.dh.BnBNode)")
             for var in LD.block_model.coupling_variables
                 coupling_id = var.key.coupling_id
+                block_id = var.key.block_id
                 print(LD.dh.lagrange_value, ", ")
                 print(LD.dh.lagrange_value, "$(block_id)| "*replace(string(coupling_id), ","=>"|"))
             end

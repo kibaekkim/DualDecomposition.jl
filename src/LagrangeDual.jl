@@ -228,7 +228,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             print(LD.dh.sub_solution[block_id], "Node $(LD.dh.BnBNode)")
             for var in LD.block_model.coupling_variables
                 coupling_id = var.key.coupling_id
-                print(LD.dh.lsub_solution[block_id], ", ")
+                print(LD.dh.sub_solution[block_id], ", ")
                 print(LD.dh.sub_solution[block_id], coupling_id)
             end
             print(LD.dh.lagrange_value, "\n")

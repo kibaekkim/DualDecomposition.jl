@@ -66,7 +66,7 @@ mutable struct DataHelper
 
         dh.sub_solution = Dict{Int, IOStream}()
         for block_id in parallel.getpartition()
-            dh.sub_solution[block_id] = open("$(dir)/sub_solution.csv", "a")
+            dh.sub_solution[block_id] = open("$(dir)/sub_solution_$(block_id).csv", "a")
         end
 
         if parallel.is_root()

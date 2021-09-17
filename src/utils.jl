@@ -64,9 +64,9 @@ mutable struct DataHelper
         dh.iter = 0
 
         if parallel.is_root()
-            dh.subobj_values = open("$(dir)/subobj_values.txt", "a")
-            dh.primal_value = open("$(dir)/primal_value.txt", "a")
-            dh.lagrange_value = open("$(dir)/lagrange_value.txt", "a")
+            dh.subobj_values = open("$(dir)/subobj_values.csv", "a")
+            dh.primal_value = open("$(dir)/primal_value.csv", "a")
+            dh.lagrange_value = open("$(dir)/lagrange_value.csv", "a")
         else
             dh.dual_value = nothing
             dh.primal_value = nothing

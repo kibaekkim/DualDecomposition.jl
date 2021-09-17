@@ -325,8 +325,8 @@ index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableKey) = LD.var_to_inde
 index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableRef) = index_of_λ(LD, var.key)
 
 function write_times(LD::AbstractLagrangeDual; dir = ".")
-    write_file!(LD.subsolve_time, "subsolve_time.txt", dir)
-    write_file!(LD.subcomm_time, "subcomm_time", dir)
+    write_file!(LD.subsolve_time, "subsolve_time", dir)
+    write_file!(LD.subcomm_time, "subcomm_time.txt", dir)
     write_file!(LD.master_time, "master_time.txt", dir)
 end
 

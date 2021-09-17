@@ -230,7 +230,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
                 coupling_id = var.key.coupling_id
                 block_id_ = var.key.block_id
                 print(LD.dh.sub_solution[block_id], ", ")
-                print(LD.dh.sub_solution[block_id], "$(block_id_)| "*replace(string(coupling_id), ","=>"|", "Any["=>"", "]"=>""))
+                print(LD.dh.sub_solution[block_id], "$(block_id_)| "*replace(replace(replace(string(coupling_id), ","=>"|"), "Any["=>""), "]"=>""))
             end
             print(LD.dh.sub_solution[block_id], "\n")
         end
@@ -243,7 +243,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
                 coupling_id = var.key.coupling_id
                 block_id = var.key.block_id
                 print(LD.dh.lagrange_value, ", ")
-                print(LD.dh.lagrange_value, "$(block_id)| "*replace(string(coupling_id), ","=>"|", "Any["=>"", "]"=>""))
+                print(LD.dh.lagrange_value, "$(block_id)| "*replace(replace(replace(string(coupling_id), ","=>"|"), "Any["=>""), "]"=>""))
             end
             print(LD.dh.lagrange_value, "\n")
         end

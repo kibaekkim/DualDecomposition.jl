@@ -150,7 +150,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         if !isnothing(LD.dh)
             for block_id in parallel.getpartition()
-                write_line!(subgrads[block_id], [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.dh.sub_solution[block_id])
+                write_line!(-1 * subgrads[block_id], [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.dh.sub_solution[block_id])
             end
         end
 
@@ -332,7 +332,7 @@ end
 
 function write_all(LD::AbstractLagrangeDual; dir = ".")
     write_times(LD, dir = dir)
-    write_file!(LD.subobj_value, "subobj_value.txt", dir)
+    write_file!(LD.subobj_value, "subobj_value", dir)
 end
 
 function get_solution!(LD::AbstractLagrangeDual, method::BM.AbstractMethod)

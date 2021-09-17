@@ -94,7 +94,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         if !isnothing(LD.dh)
             LD.dh.iter += 1
             if parallel.is_root()
-                write_line!(λ, [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.dh.lagrange_value)
+                write_line!(λ, LD.dh, LD.dh.lagrange_value)
             end
         end
 
@@ -229,7 +229,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             for var in LD.block_model.coupling_variables
                 coupling_id = var.key.coupling_id
                 print(LD.dh.sub_solution[block_id], ", ")
-                print(LD.dh.sub_solution[block_id], replace(string(coupling_id), ","=>"."))
+                print(LD.dh.sub_solution[block_id], "$(block_id)| "*replace(string(coupling_id), ","=>"|"))
             end
             print(LD.dh.sub_solution[block_id], "\n")
         end
@@ -241,7 +241,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             for var in LD.block_model.coupling_variables
                 coupling_id = var.key.coupling_id
                 print(LD.dh.lagrange_value, ", ")
-                print(LD.dh.lagrange_value, replace(string(coupling_id), ","=>"."))
+                print(LD.dh.lagrange_value, "$(block_id)| "*replace(string(coupling_id), ","=>"|"))
             end
             print(LD.dh.lagrange_value, "\n")
         end

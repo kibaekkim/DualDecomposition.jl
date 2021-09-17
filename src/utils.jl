@@ -96,11 +96,11 @@ function write_line!(v::Dict{<:Any,<:Any}, keys::Vector{<:Any}, dh::DataHelper, 
     print(io, "\n")
 end
 
-function write_line!(v::Vector{<:Any}, keys::Vector{Int}, dh::DataHelper, io::IOStream)
+function write_line!(v::Vector{<:Any}, dh::DataHelper, io::IOStream)
     print(io, "Iter $(dh.iter)")
-    for key in keys
+    for var in v
         print(io, ", ")
-        print(io, v[key])
+        print(io, var)
     end
     print(io, "\n")
 end

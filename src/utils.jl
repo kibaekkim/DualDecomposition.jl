@@ -52,7 +52,7 @@ mutable struct DataHelper
     iter::Int
 
 
-    dual_value::Union{Nothing,IOStream}
+    subobj_values::Union{Nothing,IOStream}
     primal_value::Union{Nothing,IOStream}
 
     function DataHelper(dir = ".")
@@ -62,7 +62,7 @@ mutable struct DataHelper
         dh.iter = 0
 
         if parallel.is_root()
-            dh.dual_value = open("$(dir)/dual_value.txt", "a")
+            dh.subobj_values = open("$(dir)/dual_value.txt", "a")
             dh.primal_value = open("$(dir)/primal_value.txt", "a")
         else
             dh.dual_value = nothing
@@ -90,7 +90,7 @@ end
 function close_all(dh::DataHelper)
     
     if parallel.is_root()
-        close(dual_value)
+        close(subobj_values)
         close(dh.primal_value)
     end
 end

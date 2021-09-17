@@ -229,9 +229,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             for var in LD.block_model.coupling_variables
                 coupling_id = var.key.coupling_id
                 print(LD.dh.sub_solution[block_id], ", ")
-                print(LD.dh.sub_solution[block_id], coupling_id)
+                print(LD.dh.sub_solution[block_id], replace(string(coupling_id), ","=>"."))
             end
-            print(LD.dh.lagrange_value, "\n")
+            print(LD.dh.sub_solution[block_id], "\n")
         end
     end
 
@@ -241,7 +241,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             for var in LD.block_model.coupling_variables
                 coupling_id = var.key.coupling_id
                 print(LD.dh.lagrange_value, ", ")
-                print(LD.dh.lagrange_value, coupling_id)
+                print(LD.dh.lagrange_value, replace(string(coupling_id), ","=>"."))
             end
             print(LD.dh.lagrange_value, "\n")
         end

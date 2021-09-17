@@ -90,6 +90,15 @@ function write_line!(v::Dict{<:Any,<:Any}, keys::Vector{<:Any}, dh::DataHelper, 
     print(io, "\n")
 end
 
+function write_line!(v::Vector{<:Any}, keys::Vector{Int}, dh::DataHelper, io::IOStream)
+    print(io, "Iter $(dh.iter)")
+    for key in keys
+        print(io, ", ")
+        print(io, v[key])
+    end
+    print(io, "\n")
+end
+
 function close_all(dh::DataHelper)
     
     if parallel.is_root()

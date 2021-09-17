@@ -200,7 +200,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             end
             push!(LD.subobj_value, sum(objvals_vec))
             if !isnothing(LD.dh)
-                write_line!(objvals_combined, 1:length(objvals_combined), LD.dh, LD.dh.dual_value)
+                write_line!(objvals_combined, 1:length(objvals_combined), LD.dh, LD.dh.subobj_values)
             end
         end
 

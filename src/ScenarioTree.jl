@@ -336,7 +336,7 @@ end
 function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, symb::Symbol, 
         vars::AbstractArray{JuMP.VariableRef})
     for key in eachindex(vars)
-        push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, key], vars[key]))
+        push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, Tuple(key)], vars[key]))
     end
 end
 

@@ -334,9 +334,23 @@ function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, bloc
 end
 
 function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, symb::Symbol, 
-        vars::AbstractArray{JuMP.VariableRef})
-    for key in eachindex(vars)
-        push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, Tuple(key)], vars[key]))
+    var::Array{JuMP.VariableRef})
+    for (index, value) in pairs(var)
+        push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, Tuple(index)], value))
+    end
+end
+
+function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, symb::Symbol, 
+    var::JuMP.Containers.DenseAxisArray{JuMP.VariableRef})
+    for (index, value) in pairs(var.data)
+        push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, keys(var)[index].I], value))
+    end
+end
+
+function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, symb::Symbol, 
+    var::JuMP.Containers.SparseAxisArray{JuMP.VariableRef})
+    for (index, value) in var.data
+        push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, index], value))
     end
 end
 

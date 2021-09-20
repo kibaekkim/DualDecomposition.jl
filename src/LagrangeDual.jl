@@ -160,9 +160,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         objective_print = Dict{Int, Float64}()
         for var in coupling_variables(LD)
             if haskey(objective_print, var.key.block_id)
-                objective_print[block_id] += subgrads[var.key.block_id][index_of_λ(LD, var)] * λ[index_of_λ(LD, var)]
+                objective_print[var.key.block_id] += subgrads[var.key.block_id][index_of_λ(LD, var)] * λ[index_of_λ(LD, var)]
             else
-                objective_print[block_id] = subgrads[var.key.block_id][index_of_λ(LD, var)] * λ[index_of_λ(LD, var)]
+                objective_print[var.key.block_id] = subgrads[var.key.block_id][index_of_λ(LD, var)] * λ[index_of_λ(LD, var)]
             end
         end
         for block_id in parallel.getpartition()

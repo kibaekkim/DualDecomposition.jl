@@ -113,6 +113,8 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             end
         end
 
+        print(block_model(LD)[1])
+
         for (id,m) in block_model(LD)
             # Initialize subgradients
             subgrads[id] = sparsevec(Dict{Int,Float64}(), length(λ))

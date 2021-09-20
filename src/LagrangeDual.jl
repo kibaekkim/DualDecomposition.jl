@@ -91,13 +91,6 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
     function solveLagrangeDual(λ::Array{Float64,1})
         @assert length(λ) == num_all_coupling_variables
 
-        if !isnothing(LD.dh)
-            LD.dh.iter += 1
-            if parallel.is_root()
-                write_line!(λ, LD.dh, LD.dh.lagrange_value)
-            end
-        end
-
         # broadcast λ
         if parallel.is_root()
             parallel.bcast(λ)
@@ -111,6 +104,13 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         # Adjust block objective function
         for var in coupling_variables(LD)
             adjust_objective_function!(LD, var, λ[index_of_λ(LD, var)])
+        end
+
+        if !isnothing(LD.dh)
+            LD.dh.iter += 1
+            if parallel.is_root()
+                write_line!(λ, LD.dh, LD.dh.lagrange_value)
+            end
         end
 
         for (id,m) in block_model(LD)

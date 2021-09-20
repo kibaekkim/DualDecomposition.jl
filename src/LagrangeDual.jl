@@ -113,8 +113,8 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             end
         end
 
-        print(block_model(LD)[1])
-        readline()
+        #print(block_model(LD)[1])
+        #readline()
 
         for (id,m) in block_model(LD)
             # Initialize subgradients

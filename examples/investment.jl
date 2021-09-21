@@ -75,10 +75,6 @@ function create_nodes()::DD.Tree
                 [l=1:L], y[l] - x[l] == 0 
             end
         )
-
-        JuMP.unregister(mdl, :x)
-        JuMP.unregister(mdl, :y)
-        JuMP.unregister(mdl, :B)
     end
 
     DD.set_stage_builder!(tree, 1, subproblem_builder)
@@ -131,11 +127,6 @@ function create_nodes!(tree::DD.Tree, pt::Int)
                     DD.set_cost_coefficient(node, y[l], -π[l])
                 end
             end
-            JuMP.unregister(mdl, :x)
-            JuMP.unregister(mdl, :y)
-            JuMP.unregister(mdl, :B)
-            JuMP.unregister(mdl, :y_)
-            JuMP.unregister(mdl, :B_)
         end
 
         DD.set_stage_builder!(tree, id, subproblem_builder)

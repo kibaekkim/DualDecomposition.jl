@@ -154,8 +154,15 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         if !isnothing(LD.dh)
             for block_id in parallel.getpartition()
                 write_line!(-1 * subgrads[block_id], [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.dh.sub_solution[block_id])
-                write_line!(Dict{Int,Float64}(index_of_λ(LD, var) => JuMP.objective_function(block_model(LD, block_id), QuadExpr).aff.terms[var.ref] for var in coupling_variables(LD)),
-                    LD.dh, LD.dh.sub_solution[block_id])
+                coef = Dict{Int,Float64}()
+                for var in coupling_variables(LD)
+                    try
+                        coef[index_of_λ(LD, var)] = JuMP.objective_function(block_model(LD, block_id), QuadExpr).aff.terms[var.ref] 
+                    catch e
+                        coef[index_of_λ(LD, var)] = 0.0
+                    end
+                end
+                write_line!(coef, [index_of_λ(LD, var) for var in coupling_variables(LD)], LD.dh, LD.dh.sub_solution[block_id])
             end
         end
 

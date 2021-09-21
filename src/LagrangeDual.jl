@@ -168,9 +168,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         for (id, m) in block_model(LD)
             try
-                println("block_id $(block_id) - dual: $(-JuMP.dual_bjective_value(m))")
+                println("block_id $(id) - dual: $(-JuMP.dual_bjective_value(m))")
             catch e
-                println("block_id $(block_id) - primal: $(-JuMP.objective_value(m))")
+                println("block_id $(id) - primal: $(-JuMP.objective_value(m))")
             end
         end
         for block_id in parallel.getpartition()

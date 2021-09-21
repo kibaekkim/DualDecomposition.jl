@@ -101,6 +101,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         subgrads = Dict{Int,SparseVector{Float64}}()
         subsolve_time = Dict{Int,Float64}()
 
+        println(JuMP.objective_function(block_model(LD, 1), QuadExpr).aff)
+        println("adjust")
+
         # Adjust block objective function
         for var in coupling_variables(LD)
             adjust_objective_function!(LD, var, λ[index_of_λ(LD, var)])
@@ -167,25 +170,25 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             end
         end
 
-        objective_print = Dict{Int, Float64}()
-        for var in coupling_variables(LD)
-            if haskey(objective_print, var.key.block_id)
-                objective_print[var.key.block_id] += subgrads[var.key.block_id][index_of_λ(LD, var)] * λ[index_of_λ(LD, var)]
-            else
-                objective_print[var.key.block_id] = subgrads[var.key.block_id][index_of_λ(LD, var)] * λ[index_of_λ(LD, var)]
-            end
-        end
+        # objective_print = Dict{Int, Float64}()
+        # for var in coupling_variables(LD)
+        #     if haskey(objective_print, var.key.block_id)
+        #         objective_print[var.key.block_id] += subgrads[var.key.block_id][index_of_λ(LD, var)] * λ[index_of_λ(LD, var)]
+        #     else
+        #         objective_print[var.key.block_id] = subgrads[var.key.block_id][index_of_λ(LD, var)] * λ[index_of_λ(LD, var)]
+        #     end
+        # end
 
-        for (id, m) in block_model(LD)
-            try
-                println("block_id $(id) - dual: $(-JuMP.dual_bjective_value(m))")
-            catch e
-                println("block_id $(id) - primal: $(-JuMP.objective_value(m))")
-            end
-        end
-        for block_id in parallel.getpartition()
-            println("block_id $(block_id): $(objective_print[block_id])")
-        end
+        # for (id, m) in block_model(LD)
+        #     try
+        #         println("block_id $(id) - dual: $(-JuMP.dual_bjective_value(m))")
+        #     catch e
+        #         println("block_id $(id) - primal: $(-JuMP.objective_value(m))")
+        #     end
+        # end
+        # for block_id in parallel.getpartition()
+        #     println("block_id $(block_id): $(objective_print[block_id])")
+        # end
 
 
         #run heuristics

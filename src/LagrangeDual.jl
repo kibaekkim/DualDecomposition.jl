@@ -101,8 +101,8 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         subgrads = Dict{Int,SparseVector{Float64}}()
         subsolve_time = Dict{Int,Float64}()
 
+        println("before adjust")
         println(JuMP.objective_function(block_model(LD, 1), QuadExpr).aff)
-        println("adjust")
 
         # Adjust block objective function
         for var in coupling_variables(LD)
@@ -117,6 +117,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         end
 
         #print(block_model(LD)[1])
+        println("after adjust")
         println(JuMP.objective_function(block_model(LD, 1), QuadExpr).aff)
         #readline()
 
@@ -229,10 +230,16 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             end
         end
 
+
+        println("before reset")
+        println(JuMP.objective_function(block_model(LD, 1), QuadExpr).aff)
         # Reset objective coefficients
         for var in coupling_variables(LD)
             reset_objective_function!(LD, var, λ[index_of_λ(LD, var)])
         end        
+
+        println("after reset")
+        println(JuMP.objective_function(block_model(LD, 1), QuadExpr).aff)
 
         parallel.barrier()
         comm_time = time()

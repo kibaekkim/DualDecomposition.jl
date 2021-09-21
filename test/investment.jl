@@ -55,13 +55,13 @@
         function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
             mdl = subtree.model
             #x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
-            x = @variable(mdl, x[l=1:L], base_name="n1_x")
+            x = @variable(mdl, [l=1:L], base_name="n1_x")
             DD.set_control_variable!(node, :x, x)
     
-            y = @variable(mdl, y[l=1:L] >= 0, base_name="n1_y")
+            y = @variable(mdl, [l=1:L], lower_bound = 0, base_name="n1_y")
             DD.set_output_variable!(node, :y, y)
     
-            B = @variable(mdl, B >= 0, base_name="n1_B")
+            B = @variable(mdl, lower_bound = 0, base_name="n1_B")
             DD.set_output_variable!(node, :B, B)
     
             π = DD.get_scenario(node)[:π]
@@ -71,10 +71,6 @@
                     [l=1:L], y[l] - x[l] == 0 
                 end
             )
-    
-            JuMP.unregister(mdl, :x)
-            JuMP.unregister(mdl, :y)
-            JuMP.unregister(mdl, :B)
         end
     
         DD.set_stage_builder!(tree, 1, subproblem_builder)
@@ -96,19 +92,19 @@
                 mdl = subtree.model
                 id = DD.get_id(node)
                 #x = @variable(mdl, x[l=1:L], Int, base_name = "n$(id)_x")
-                x = @variable(mdl, x[l=1:L], base_name = "n$(id)_x")
+                x = @variable(mdl, [l=1:L], base_name = "n$(id)_x")
                 DD.set_control_variable!(node, :x, x)
     
-                y = @variable(mdl, y[l=1:L] >= 0, base_name = "n$(id)_y")
+                y = @variable(mdl, [l=1:L], lower_bound = 0, base_name = "n$(id)_y")
                 DD.set_output_variable!(node, :y, y)
     
-                B = @variable(mdl, B >= 0, base_name = "n$(id)_B")
+                B = @variable(mdl, lower_bound = 0, base_name = "n$(id)_B")
                 DD.set_output_variable!(node, :B, B)
     
-                y_ = @variable(mdl, y_[l=1:L] >= 0, base_name = "n$(id)_y_")
+                y_ = @variable(mdl, [l=1:L], lower_bound = 0, base_name = "n$(id)_y_")
                 DD.set_input_variable!(node, :y, y_)
     
-                B_ = @variable(mdl, B_ >= 0, base_name = "n$(id)_B_")
+                B_ = @variable(mdl, lower_bound = 0, base_name = "n$(id)_B_")
                 DD.set_input_variable!(node, :B, B_)
     
                 π = DD.get_scenario(node)[:π]
@@ -127,11 +123,6 @@
                         DD.set_cost_coefficient(node, y[l], -π[l])
                     end
                 end
-                JuMP.unregister(mdl, :x)
-                JuMP.unregister(mdl, :y)
-                JuMP.unregister(mdl, :B)
-                JuMP.unregister(mdl, :y_)
-                JuMP.unregister(mdl, :B_)
             end
     
             DD.set_stage_builder!(tree, id, subproblem_builder)

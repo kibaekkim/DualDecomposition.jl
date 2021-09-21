@@ -114,6 +114,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         end
 
         #print(block_model(LD)[1])
+        println(JuMP.objective_function(block_model(LD, 1), QuadExpr).aff)
         #readline()
 
         for (id,m) in block_model(LD)

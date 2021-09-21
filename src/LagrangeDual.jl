@@ -165,8 +165,11 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
                 objective_print[var.key.block_id] = subgrads[var.key.block_id][index_of_λ(LD, var)] * λ[index_of_λ(LD, var)]
             end
         end
+        for (id, m) in block_model(LD)
+            println("block_id $(block_id) - dual: $(-JuMP.objective_value(m)), primal: $(-JuMP.dual_objective_value(m))")
+        end
         for block_id in parallel.getpartition()
-            println(objective_print[block_id])
+            println("block_id $(block_id): $(objective_print[block_id])")
         end
 
 

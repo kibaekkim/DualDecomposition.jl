@@ -34,5 +34,6 @@ include("LagrangeMaster/SubgradientMethod.jl")
 include("LagrangeDual.jl")
 include("ScenarioTree.jl")
 include("utils.jl")
+include("JuMP.jl")
 
 end  # module DualDecomposition

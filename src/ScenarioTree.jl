@@ -142,24 +142,24 @@ Contains TreeNode and other information that are used for dual decomposition.
     - `weight`: multiplied to the objective
     - `in`: dictionary of incoming variables from the previous stage
     - `out`: dictionary of outgoing variablees to the subsequent stage
-    - `cost`: cost coefficient
+    - `obj`: objective expression
 """
 
 mutable struct SubTreeNode <: AbstractTreeNode
     treenode::AbstractTreeNode
     weight::Float64
-    in::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}    # incoming variables
-    out::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # outgoing variables
-    control::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # control variables
-    cost::Dict{JuMP.VariableRef, Float64}
+    in::Dict{String, JuMP.VariableRef}    # incoming variables
+    out::Dict{String, JuMP.VariableRef}   # outgoing variables
+    control::Dict{String, JuMP.VariableRef}   # control variables
+    obj::Union{Float64, JuMP.AbstractJuMPScalar}
     function SubTreeNode(treenode::AbstractTreeNode, weight::Float64)
         stn = new()
         stn.treenode = treenode
         stn.weight = weight
-        stn.in = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
-        stn.out = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
-        stn.control = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
-        stn.cost = Dict{JuMP.VariableRef, Float64}()
+        stn.in = Dict{String, JuMP.VariableRef}()
+        stn.out = Dict{String, JuMP.VariableRef}()
+        stn.control = Dict{String, JuMP.VariableRef}()
+        stn.obj = 0.0
         return stn
     end
 end
@@ -171,21 +171,6 @@ get_stage(node::SubTreeNode) = get_stage(node.treenode)
 get_scenario(node::SubTreeNode) = get_scenario(node.treenode)
 get_probability(node::SubTreeNode) = get_probability(node.treenode)
 
-function set_input_variable!(nd::SubTreeNode, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
-    nd.in[symb] = var
-end
-
-function set_output_variable!(nd::SubTreeNode, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
-    nd.out[symb] = var
-end
-
-function set_control_variable!(nd::SubTreeNode, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
-    nd.control[symb] = var
-end
-
-function set_cost_coefficient(nd::SubTreeNode, var::JuMP.VariableRef, coeff::Float64)
-    nd.cost[var] = coeff
-end
 
 """
     SubTree
@@ -229,14 +214,13 @@ function create_subtree!(tree::Tree, block_id::Int, coupling_variables::Vector{C
         subnode = SubTreeNode(node, weight)
         add_node!(subtree, subnode)
     end
-
+    obj = 0
     for (id, subnode) in subtree.nodes
         subnode.treenode.stage_builder(tree, subtree, subnode) # make macro for changing variable names and constraint names to include node id
-        for (var, coeff) in subnode.cost
-            JuMP.set_objective_coefficient(subtree.model, var, subnode.weight * coeff)
-        end
+        unregister_all!(subtree.model)
+        obj += subnode.weight * subnode.obj
     end
-    JuMP.set_objective_sense(subtree.model, MOI.MIN_SENSE)
+    JuMP.set_objective(subtree.model, MOI.MIN_SENSE, obj)
 
     # 
     for (id, subnode) in subtree.nodes
@@ -254,6 +238,20 @@ function create_subtree!(tree::Tree, block_id::Int, coupling_variables::Vector{C
 end
 
 """
+    unregister_all!
+
+unregisters all keys in a model so that variables with same symbols can be used for different stages
+
+"""
+
+function unregister_all!(model::JuMP.Model)
+    dict = JuMP.object_dictionary(model)
+    for (key, var) in dict
+        JuMP.unregister(model, key)
+    end
+end
+
+"""
     add_links!
 
 creates linking constraints for nodes within the subtree by connecting the incoming and outgoing variables
@@ -267,8 +265,8 @@ creates linking constraints for nodes within the subtree by connecting the incom
 function add_links!(tree::SubTree, id::Int, pt::Int)
     node = tree.nodes[id]
     parent = tree.nodes[pt]
-    for (symb, var1) in node.in
-        var2 = parent.out[symb]
+    for (ref, var1) in node.in
+        var2 = parent.out[ref]
         @constraint(tree.model, var1 .== var2)
     end
 end
@@ -286,8 +284,8 @@ couple outgoing variables
 
 function couple_common_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, node::SubTreeNode)
     label = get_id(node)
-    for (symb, var) in node.out
-        couple_variables!(coupling_variables, block_id, label, symb, var)
+    for (ref, var) in node.out
+        couple_variables!(coupling_variables, block_id, label, ref, var)
     end
 end
 
@@ -304,8 +302,8 @@ couple incoming variables with the root node of the subtree
 
 function couple_incoming_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, child::SubTreeNode)
     label = get_parent(child)
-    for (symb, var) in child.in
-        couple_variables!(coupling_variables, block_id, label, symb, var)
+    for (ref, var) in child.in
+        couple_variables!(coupling_variables, block_id, label, ref, var)
     end
 end
 
@@ -318,20 +316,14 @@ adds variables to coupling_variables
     - `coupling_variables`: vector of coupling variables
     - `block_id`: ID of block
     - `label`: ID of node
-    - `symb`: symbol for variable 
+    - `ref`: reference for variable 
     - `var`: variable or vector of variables
 """
 
-function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, symb::Symbol, 
+function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, ref::String, 
         var::JuMP.VariableRef)
-    push!(coupling_variables, CouplingVariableRef(block_id, [label, symb], var))
-end
-
-function couple_variables!(coupling_variables::Vector{CouplingVariableRef}, block_id::Int, label::Int, symb::Symbol, 
-        vars::AbstractArray{JuMP.VariableRef})
-    for key in eachindex(vars)
-        push!(coupling_variables, CouplingVariableRef(block_id, [label, symb, key], vars[key]))
-    end
+    name = "n$(label)_" * ref
+    push!(coupling_variables, CouplingVariableRef(block_id, name, var))
 end
 
 """

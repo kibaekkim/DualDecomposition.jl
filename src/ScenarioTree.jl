@@ -201,13 +201,12 @@ end
 creates subtree from vector of nodes and adds coupling variables
 
 # Arguments
-    - `tree`: Tree
     - `block_id`: ID of subtree
     - 'coupling_variables': list of coupling variables to be modified
     - `nodes`: vector of nodes
 """
 
-function create_subtree!(tree::Tree, block_id::Int, coupling_variables::Vector{CouplingVariableRef}, nodes::Vector{Tuple{TreeNode,Float64}})::SubTree
+function create_subtree!(block_id::Int, coupling_variables::Vector{CouplingVariableRef}, nodes::Vector{Tuple{TreeNode,Float64}})::SubTree
     subtree = SubTree(block_id)
     # add nodes to subtree
     for (node, weight) in nodes

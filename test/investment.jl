@@ -139,7 +139,7 @@
         coupling_variables = Vector{DD.CouplingVariableRef}()
         models = Dict{Int,JuMP.Model}()
         for (block_id, nodes) in enumerate(node_cluster)
-            subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
+            subtree = DD.create_subtree!(block_id, coupling_variables, nodes)
             set_optimizer(subtree.model, GLPK.Optimizer)
             DD.add_block_model!(algo, block_id, subtree.model)
             models[block_id] = subtree.model
@@ -166,7 +166,7 @@
         coupling_variables = Vector{DD.CouplingVariableRef}()
         models = Dict{Int,JuMP.Model}()
         for (block_id, nodes) in enumerate(node_cluster)
-            subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
+            subtree = DD.create_subtree!(block_id, coupling_variables, nodes)
             set_optimizer(subtree.model, GLPK.Optimizer)
             DD.add_block_model!(algo, block_id, subtree.model)
             models[block_id] = subtree.model
@@ -194,7 +194,7 @@
         coupling_variables = Vector{DD.CouplingVariableRef}()
         models = Dict{Int,JuMP.Model}()
         for (block_id, nodes) in enumerate(node_cluster)
-            subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
+            subtree = DD.create_subtree!(block_id, coupling_variables, nodes)
             set_optimizer(subtree.model, GLPK.Optimizer)
             DD.add_block_model!(algo, block_id, subtree.model)
             models[block_id] = subtree.model

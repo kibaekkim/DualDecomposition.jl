@@ -54,12 +54,14 @@ function JuMP.add_variable(
         "n$(node_id)_" * name
     )
     ref = ""
-    try
-        element = name[findfirst(x -> x=='[', name):end]
-        ref = "$(info.ref_symbol)" * element
-    catch
+    loc = findfirst(x -> x=='[', name)
+    if isnothing(loc)
         ref = "$(info.ref_symbol)"
+    else
+        element = name[loc:end]
+        ref = "$(info.ref_symbol)" * element
     end
+    
     if info isa InStateInfo
         set_input_variable!(info.subnode, ref, var)
     elseif info isa OutStateInfo

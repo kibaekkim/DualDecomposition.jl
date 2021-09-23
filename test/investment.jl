@@ -51,8 +51,7 @@
         tree = DD.Tree(ξ)
 
         #subproblem formulation
-        function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
-            mdl = subtree.model
+        function subproblem_builder(mdl::JuMP.Model, node::DD.SubTreeNode)
             @variable(mdl, x[l=1:L], DD.ControlInfo, subnode = node, ref_symbol = :x)
 
             @variable(mdl, y[l=1:L] >= 0, DD.OutStateInfo, subnode = node, ref_symbol = :y)
@@ -84,8 +83,7 @@
             id = DD.add_child!(tree, pt, ξ, prob)
 
             #subproblem formulation
-            function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
-                mdl = subtree.model
+            function subproblem_builder(mdl::JuMP.Model, node::DD.SubTreeNode)
                 @variable(mdl, x[l=1:L], DD.ControlInfo, subnode = node, ref_symbol = :x)
 
                 @variable(mdl, y[l=1:L] >= 0, DD.OutStateInfo, subnode = node, ref_symbol = :y)

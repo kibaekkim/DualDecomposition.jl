@@ -13,7 +13,7 @@ abstract type AbstractTreeNode end
 Tree node stores information of stage problem
 
     - `id`: index of node
-    - `stage_builder`: adds variables and constraints to model with input (tree::Tree, subtree::SubTree, node::SubTreeNode)
+    - `stage_builder`: adds variables and constraints to model with input (model::JuMP.Model, node::SubTreeNode)
     - `parent`: index of parent node
     - `children`: indices of child nodes
     - `stage`: current stage
@@ -216,7 +216,7 @@ function create_subtree!(tree::Tree, block_id::Int, coupling_variables::Vector{C
     end
     obj = 0
     for (id, subnode) in subtree.nodes
-        subnode.treenode.stage_builder(tree, subtree, subnode) # make macro for changing variable names and constraint names to include node id
+        subnode.treenode.stage_builder(subtree.model, subnode)
         unregister_all!(subtree.model)
         obj += subnode.weight * subnode.obj
     end

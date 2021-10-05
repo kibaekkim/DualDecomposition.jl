@@ -84,6 +84,10 @@ Tree(ξ::Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}) = Tree(Dict{Int,
 
 get_NodeType(tree::Tree{T}) where {T} = T
 
+function add_tree!(LD::AbstractLagrangeDual, tree::AbstractTree)
+    LD.tree = tree
+end
+
 """
     add_node!
 

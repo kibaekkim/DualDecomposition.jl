@@ -17,6 +17,8 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
 
+    tree::Union{Nothing,Tree{TreeNode}}
+
     function LagrangeDual()
         LD = new()
         LD.block_model = BlockModel()
@@ -26,6 +28,8 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
         LD.subcomm_time = []
         LD.subobj_value = []
         LD.master_time = []
+
+        LD.tree = nothing
         
         return LD
     end

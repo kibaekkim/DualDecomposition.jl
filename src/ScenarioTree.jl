@@ -24,6 +24,7 @@ Tree node stores information of stage problem
 mutable struct TreeNode <: AbstractTreeNode
     id::Int
     stage_builder::Union{Nothing,Function}
+    coupling_variables::Dict{Any,Vector{CouplingVariableRef}}
     parent::Int
     children::Vector{Tuple{Int, Float64}}
     stage::Int
@@ -35,6 +36,7 @@ mutable struct TreeNode <: AbstractTreeNode
         tn = new()
         tn.id = id
         tn.stage_builder = nothing
+        tn.coupling_variables = Dict{Any,Vector{CouplingVariableRef}}()
         tn.parent = parent
         tn.children = Vector{Tuple{Int, Float64}}()
         tn.stage = stage
@@ -156,6 +158,7 @@ mutable struct SubTreeNode <: AbstractTreeNode
     out::Dict{String, JuMP.VariableRef}   # outgoing variables
     control::Dict{String, JuMP.VariableRef}   # control variables
     obj::Union{Float64, JuMP.AbstractJuMPScalar}
+    sol::Dict{Any, Any}
     function SubTreeNode(treenode::AbstractTreeNode, weight::Float64)
         stn = new()
         stn.treenode = treenode
@@ -164,6 +167,7 @@ mutable struct SubTreeNode <: AbstractTreeNode
         stn.out = Dict{String, JuMP.VariableRef}()
         stn.control = Dict{String, JuMP.VariableRef}()
         stn.obj = 0.0
+        stn.sol = Dict()
         return stn
     end
 end
@@ -195,8 +199,9 @@ mutable struct SubTree <: AbstractTree
     model::JuMP.AbstractModel 
     parent::Int
     root::Int
+    sol::Dict{Any,Any}
     function SubTree(block_id::Int)
-        return new(block_id, Dict{Int,SubTreeNode}(), Int[], JuMP.Model(), 0, 1)
+        return new(block_id, Dict{Int,SubTreeNode}(), Int[], JuMP.Model(), 0, 1, Dict())
     end
 end
 
@@ -418,3 +423,21 @@ function check_root(node::AbstractTreeNode)::Bool
 end
 
 check_root(node::SubTreeNode) = check_root(node.treenode)
+
+function set_coupling_variables!(LD::AbstractLagrangeDual, variables::Vector{CouplingVariableRef}, tree::Tree)
+    set_coupling_variables!(LD, variables)
+    for variable in variables
+        loc = findfirst(x -> x=='_', variable.key.coupling_id)
+        label = parse(Int64, variable.key.coupling_id[2:loc-1])
+        node = tree.nodes[label]
+        add_coupling_variable!(node, variable.key.coupling_id, variable)
+    end
+end
+
+function add_coupling_variable!(node::AbstractTreeNode, coupling_id::Any, variable::CouplingVariableRef)
+    if haskey(node.coupling_variables, coupling_id)
+        push!(node.coupling_variables[coupling_id], variable)
+    else
+        node.coupling_variables[coupling_id] = [variable]
+    end
+end

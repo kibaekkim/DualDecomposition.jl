@@ -191,11 +191,12 @@ Used for creeating and keeeping subproblems
 mutable struct SubTree <: AbstractTree
     block_id::Int
     nodes::Dict{Int,SubTreeNode}     # list of nodes
+    nodelabels::Vector{Int}
     model::JuMP.AbstractModel 
     parent::Int
     root::Int
     function SubTree(block_id::Int)
-        return new(block_id, Dict{Int,SubTreeNode}(), JuMP.Model(), 0, 1)
+        return new(block_id, Dict{Int,SubTreeNode}(), Int[], JuMP.Model(), 0, 1)
     end
 end
 
@@ -237,6 +238,8 @@ function create_subtree!(block_id::Int, coupling_variables::Vector{CouplingVaria
             couple_incoming_variables!(coupling_variables, block_id, subnode)
         end
     end
+
+    subtree.nodelabels = sort!(collect(keys(subtree.nodes)))
     return subtree
 end
 

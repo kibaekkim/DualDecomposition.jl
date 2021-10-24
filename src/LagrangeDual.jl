@@ -18,6 +18,7 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
     master_time::Vector{Float64}
 
     tree
+    subtrees
 
     function LagrangeDual()
         LD = new()

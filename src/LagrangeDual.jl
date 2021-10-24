@@ -69,7 +69,7 @@ primal_solution(LD::AbstractLagrangeDual) = primal_solution(LD.block_model)
 
 This runs the Lagrangian dual method for solving the block model.
 """
-function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ = nothing)
+function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ = nothing, bound = nothing)
 
     # We assume that the block models are distributed.
     num_all_blocks = parallel.sum(num_blocks(LD))
@@ -78,6 +78,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
     # initialize λ if it is nothing
     if isnothing(initial_λ)
         initial_λ = zeros(num_all_coupling_variables)
+    end
+    if isnothing(bound)
+        bound = Inf
     end
     @assert length(initial_λ) == num_all_coupling_variables
 
@@ -201,7 +204,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
     end
 
     if parallel.is_root()
-        load!(LM, num_all_coupling_variables, num_all_blocks, solveLagrangeDual, initial_λ)
+        load!(LM, num_all_coupling_variables, num_all_blocks, solveLagrangeDual, initial_λ, bound)
     
         # Add bounding constraints to the Lagrangian master
         add_constraints!(LD, LM)

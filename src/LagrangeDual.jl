@@ -31,6 +31,7 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
         LD.master_time = []
 
         LD.tree = nothing
+        LD.subtrees = nothing
         
         return LD
     end

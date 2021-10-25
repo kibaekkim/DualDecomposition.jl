@@ -72,8 +72,8 @@ end
 function write_data!(dual_bound::Union{Nothing,Float64}, primal_bound::Union{Nothing,Float64},  dh::DataHelper)
     if parallel.is_root()
         io = dh.data_stream
-        dh.iter += 1
         println(io, "Iter $(dh.iter), $(time() - dh.start_time), $(dual_bound), $(primal_bound)")
+        dh.iter += 1
     end
 end
 

@@ -212,14 +212,13 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
     end
 
     if parallel.is_root()
+        if !isnothing(LD.dh)
+            LD.dh.start_time = time()
+        end
         load!(LM, num_all_coupling_variables, num_all_blocks, solveLagrangeDual, initial_λ, bound)
     
         # Add bounding constraints to the Lagrangian master
         add_constraints!(LD, LM)
-
-        if !isnothing(LD.dh)
-            LD.dh.start_time = time()
-        end
 
         # This runs the bundle method.
         run!(LM)

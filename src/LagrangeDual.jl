@@ -205,7 +205,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
         end
 
         if !isnothing(LD.dh) && parallel.is_root()
-            write_data!(sum(objvals_vec), LD.block_model.primal_bound, LD.dh)
+            write_data!(-sum(objvals_vec), LD.block_model.primal_bound, LD.dh)
         end
 
         return objvals_vec, subgrads_combined
@@ -223,6 +223,10 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         # This runs the bundle method.
         run!(LM)
+
+        if !isnothing(LD.dh)
+            close_all(LD.dh)
+        end
 
         # Copy master solution time
         LD.master_time = get_times(LM)

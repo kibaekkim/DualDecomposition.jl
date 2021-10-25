@@ -61,7 +61,7 @@ mutable struct DataHelper
         dh.start_time =time()
 
         if parallel.is_root()
-            dh.subobj_values = open("$(dir)/data_stream.csv", "a")
+            dh.data_stream = open("$(dir)/data_stream.csv", "a")
         else
             dh.data_stream = nothing
         end

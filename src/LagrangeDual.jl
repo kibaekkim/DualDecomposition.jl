@@ -17,7 +17,7 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
 
-    dh::Union{Nothing, DataHelper}
+    dh
 
     tree
     subtrees

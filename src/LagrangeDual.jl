@@ -137,7 +137,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
                 objvals[id] = -JuMP.objective_bound(m)
                 
                 numlim = get_optimizer_attribute(m, "CPX_PARAM_INTSOLLIM")
-                set_optimizer_attribute(m, "CPX_PARAM_INTSOLLIM", numlim+Ref{Int64}(1))
+                set_optimizer_attribute(m, "CPX_PARAM_INTSOLLIM", numlim[] + 1)
             else
                 @error "Unexpected solution status: $(status)"
             end

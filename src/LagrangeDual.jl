@@ -131,7 +131,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
                 catch e 
                     objvals[id] = -JuMP.objective_value(m)
                 end
-            elseif status in [MOI.TIME_LIMIT, SOLUTION_LIMIT]
+            elseif status in [MOI.TIME_LIMIT, MOI.SOLUTION_LIMIT]
                 objvals[id] = -JuMP.objective_bound(m)
             else
                 @error "Unexpected solution status: $(status)"

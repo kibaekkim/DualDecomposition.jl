@@ -131,13 +131,8 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
                 catch e 
                     objvals[id] = -JuMP.objective_value(m)
                 end
-            elseif status in [MOI.TIME_LIMIT]
+            elseif status in [MOI.TIME_LIMIT, MOI.SOLUTION_LIMIT]
                 objvals[id] = -JuMP.objective_bound(m)
-            elseif status in [MOI.SOLUTION_LIMIT]
-                objvals[id] = -JuMP.objective_bound(m)
-                
-                numlim = get_optimizer_attribute(m, "CPX_PARAM_INTSOLLIM")
-                set_optimizer_attribute(m, "CPX_PARAM_INTSOLLIM", numlim[] + 1)
             else
                 @error "Unexpected solution status: $(status)"
             end

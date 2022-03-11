@@ -4,3 +4,4 @@ test/*.txt
 examples/*.txt
 Manifest.toml
 settings.json
+*.txt

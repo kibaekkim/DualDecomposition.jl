@@ -98,6 +98,8 @@ function create_nodes()::DD.Tree
         DD.set_stage_objective(node, 0.0)
     end
 
+    DD.set_stage_builder!(tree, 1, subproblem_builder)
+
     create_nodes!(tree, 1)
     return tree
 end
@@ -145,6 +147,7 @@ function create_nodes!(tree::DD.Tree, pt::Int)
                 DD.set_stage_objective(node, -(B + sum( π[l] * y[l] for l in 1:L )))
             end
         end
+        DD.set_stage_builder!(tree, id, subproblem_builder)
         if DD.get_stage(tree, id) < K
             create_nodes!(tree, id)
         end
@@ -199,7 +202,7 @@ end
 # Set nonanticipativity variables as an array of symbols.
 DD.set_coupling_variables!(algo, coupling_variables)
 
-bundle_init = DD.initialize_bundle(tree, algo)
+bundle_init = DD.initialize_bundle(tree, algo, GLPK.Optimizer)
 #println(bundle_init)
 # for (id, node) in tree.nodes
 #    println(node.cost)

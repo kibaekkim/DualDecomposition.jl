@@ -18,8 +18,6 @@ mutable struct DR_LagrangeDual <: AbstractLagrangeDual
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
 
-    dh::Union{Nothing, DataHelper}
-
     tree::Union{Nothing,Tree{DR_TreeNode}}
     subtrees::Union{Nothing,Dict{Int,SubTree}}
     P_model::Union{Nothing, JuMP.Model}
@@ -33,8 +31,6 @@ mutable struct DR_LagrangeDual <: AbstractLagrangeDual
         LD.subcomm_time = []
         LD.subobj_value = []
         LD.master_time = []
-
-        LD.dh = nothing
 
         LD.tree = nothing
         LD.subtrees = nothing
@@ -140,7 +136,7 @@ function add_ambiguity_link!(m::JuMP.Model, node::DR_TreeNode, set::WassersteinS
     end
 end
 
-function initialize_bundle(tree::Tree{DR_TreeNode}, LD::DR_LagrangeDual, Optimizer=nothing)::Array{Float64,1}
+function initialize_bundle(tree::Tree{DR_TreeNode}, LD::DR_LagrangeDual, Optimizer)::Array{Float64,1}
     n = parallel.sum(num_coupling_variables(LD.block_model))
     bundle_init = Array{Float64,1}(undef, n)
     variable_keys = [v.key for v in LD.block_model.coupling_variables]
@@ -177,11 +173,7 @@ function initialize_bundle(tree::Tree{DR_TreeNode}, LD::DR_LagrangeDual, Optimiz
 end
 
 function get_feasible_P(tree::Tree{DR_TreeNode}, LD::DR_LagrangeDual, Optimizer)::Dict{Int,Float64}
-    if isnothing(Optimizer)
-        model = JuMP.Model(GLPK.Optimizer)
-    else
-        model = JuMP.Model(Optimizer)
-    end
+    model = JuMP.Model(Optimizer)
 
     @variable(model, P[2:length(tree.nodes)] >= 0)
     for (id, node) in tree.nodes

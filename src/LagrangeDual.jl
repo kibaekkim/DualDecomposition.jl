@@ -17,8 +17,6 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
 
-    dh
-
     tree
     subtrees
 
@@ -31,8 +29,6 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
         LD.subcomm_time = []
         LD.subobj_value = []
         LD.master_time = []
-
-        LD.dh = nothing
 
         LD.tree = nothing
         LD.subtrees = nothing
@@ -210,17 +206,10 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             # @printf("Subproblem sommunication time: %6.1f sec.\n", time() - comm_time)
         end
 
-        if !isnothing(LD.dh) && parallel.is_root()
-            write_data!(-sum(objvals_vec), LD.block_model.primal_bound, LD.dh)
-        end
-
         return objvals_vec, subgrads_combined
     end
 
     if parallel.is_root()
-        if !isnothing(LD.dh)
-            LD.dh.start_time = time()
-        end
         load!(LM, num_all_coupling_variables, num_all_blocks, solveLagrangeDual, initial_λ, bound)
     
         # Add bounding constraints to the Lagrangian master
@@ -228,10 +217,6 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
         # This runs the bundle method.
         run!(LM)
-
-        if !isnothing(LD.dh)
-            close_all(LD.dh)
-        end
 
         # Copy master solution time
         LD.master_time = get_times(LM)

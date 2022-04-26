@@ -35,5 +35,9 @@ include("LagrangeMaster/SubgradientMethod.jl")
 include("LagrangeDual.jl")
 include("ScenarioTree.jl")
 include("JuMP.jl")
+include("DRO/AmbiguitySet.jl")
+include("DRO/ScenarioTree.jl")
+include("DRO/BlockModel.jl")
+include("DRO/LagrangeDual.jl")
 
 end  # module DualDecomposition

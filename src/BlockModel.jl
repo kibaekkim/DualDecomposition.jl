@@ -43,7 +43,7 @@ mutable struct BlockModel <: AbstractBlockModel
 
     # TODO: These may be available with heuristics.
     primal_bound::Float64
-    primal_solution::Dict{Int, Float64} #coupling_id : value 
+    primal_solution::Dict{Any, Float64} #coupling_id : value 
     combined_weights::Dict{Int, Float64} # block_id : value 
     record::Dict{Any, Any}
 

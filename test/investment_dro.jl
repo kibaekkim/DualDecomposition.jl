@@ -48,7 +48,7 @@
     """
     In each node, we have Np=10 samples from a log-normal distribution
     """
-    const Np = 10 # number of samples
+    Np = 10 # number of samples
 
     function generate_sample(π::Array{Float64})::Array{DD.Sample}
         # generates random samples following a lognormal distribution

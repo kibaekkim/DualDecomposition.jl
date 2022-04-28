@@ -234,7 +234,7 @@ outputs the temporal decomposition at each nodes
 #need fix
 
 function decomposition_temporal(tree::Tree{DR_TreeNode}):: Vector{Vector{DR_TreeNode}}
-    node_cluster = Vector{Vector{TreeNode}}()
+    node_cluster = Vector{Vector{DR_TreeNode}}()
     for (id, node) in tree.nodes
         push!(node_cluster,[node])
     end

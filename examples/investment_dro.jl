@@ -173,8 +173,8 @@ println(JuMP.objective_value(det.model))
 
 
 #node_cluster = DD.decomposition_not(tree)
-node_cluster = DD.decomposition_scenario(tree)
-#node_cluster = DD.decomposition_temporal(tree) #There is a DUAL_INFEASIBLE issue
+#node_cluster = DD.decomposition_scenario(tree)
+node_cluster = DD.decomposition_temporal(tree) #There is a DUAL_INFEASIBLE issue
 
 # Number of block components
 NS = length(node_cluster)

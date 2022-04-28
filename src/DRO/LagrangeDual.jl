@@ -155,15 +155,8 @@ function initialize_bundle(tree::Tree{DR_TreeNode}, LD::DR_LagrangeDual, Optimiz
             if check_root(tree.nodes[node_id])
                 bundle_init[i] =  get_cost(tree.nodes[node_id], couple_id) / N
             else
-                bundle_init[i] =  get_cost(tree.nodes[node_id], couple_id) / N * P[node_id] #P[corresponding leaf node] ?
+                bundle_init[i] =  get_cost(tree.nodes[node_id], couple_id) / N * P[node_id]
             end
-            """
-            for (id, node) in tree.nodes
-                if check_leaf(node)
-                    bundle_init[i] =  get_cost(tree.nodes[node_id], couple_id)* P[get_id(node)]
-                end
-            end
-            """
         end
         parallel.bcast(bundle_init)
     else

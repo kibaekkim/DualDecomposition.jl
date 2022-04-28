@@ -46,7 +46,14 @@ function DR_TreeNode(ξ::Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}, 
 end
 
 get_set(node::DR_TreeNode) = node.set
-get_cost(node::DR_TreeNode, var_id::Any) = node.cost[var_id]
+function get_cost(node::DR_TreeNode, var_id::Any)
+    try
+        return node.cost[var_id]
+    catch e
+        return 0.0
+    end
+end
+
 function set_cost!(node::DR_TreeNode, var_id::String, coeff::Float64)
     node.cost[var_id] = coeff
 end

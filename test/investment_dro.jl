@@ -1,4 +1,4 @@
-@test_set "investment_dro" begin
+@testset "investment_dro" begin
 
     """
     a: interest rate

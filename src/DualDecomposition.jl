@@ -27,12 +27,17 @@ Empty function for `AbstractMethod`
 function run! end
 
 include("parallel.jl")
+include("utils.jl")
 include("BlockModel.jl")
 include("LagrangeMaster/LagrangeMaster.jl")
 include("LagrangeMaster/BundleMethod.jl")
 include("LagrangeMaster/SubgradientMethod.jl")
 include("LagrangeDual.jl")
 include("ScenarioTree.jl")
-include("utils.jl")
+include("JuMP.jl")
+include("DRO/AmbiguitySet.jl")
+include("DRO/ScenarioTree.jl")
+include("DRO/BlockModel.jl")
+include("DRO/LagrangeDual.jl")
 
 end  # module DualDecomposition

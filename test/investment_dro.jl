@@ -39,6 +39,7 @@
         
                 B_k ≥ 0, ∀ k=1,…,K.
     """
+    rng = Random.MersenneTwister(1234)
     K = 3
     L = 2
     a = 0.01

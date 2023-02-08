@@ -113,11 +113,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
 
             # We may want consider other statuses.
             if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
-                try
-                    objvals[id] = -JuMP.dual_objective_value(m)
-                catch e 
-                    objvals[id] = -JuMP.objective_value(m)
-                end
+                objvals[id] = -JuMP.objective_value(m)
             else
                 @error "Unexpected solution status: $(status)"
             end

@@ -60,5 +60,14 @@ DD.set_coupling_variables!(algo, coupling_variables)
 # Lagrange master method
 LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
 
+# add heuristic
+DD.add!(DD.AllBlockHeuristic, algo)
+DD.add!(DD.RoundingHeuristic, algo)
+
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)
+
+@show DD.primal_objective_value(algo)
+@show DD.dual_objective_value(algo)
+@show DD.primal_solution(algo)
+@show DD.dual_solution(algo)

@@ -13,7 +13,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     obj_limit::Float64
 
     f::Float64
-    best_f::Float64
+    # best_f::Float64
     u::Vector{Float64}
     best_u::Vector{Float64}
 
@@ -44,7 +44,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.obj_limit = +Inf
 
         am.f = -Inf
-        am.best_f = -Inf
+        # am.best_f = -Inf
         am.u = []
         am.best_u = []
 
@@ -58,7 +58,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.μ = 1.0
         am.pres = 0.0
         am.dres = 1.0
-        am.tol = 1e-8
+        am.tol = 1e-6
         am.coupling_ids = []
 
         am.constraint_matrix = nothing
@@ -79,7 +79,7 @@ end
 function add_constraints!(LD::AbstractLagrangeDual, method::AdmmMaster)
     for (i, c) in enumerate(LD.coupling_id_keys)
         vars = LD.block_model.variables_by_couple[c]
-        couplings = Array{Int}()
+        couplings = Array{Int}(undef,0)
         for v in vars
             push!(couplings, index_of_λ(LD, v))
         end
@@ -139,7 +139,7 @@ function run!(method::AdmmMaster)
         method.iter += 1
         if method.iter % 100 == 1
             @printf("%6s", "Iter")
-            @printf("\t%13s", "fbest")
+            # @printf("\t%13s", "fbest")
             @printf("\t%13s", "f")
             @printf("\t%13s", "pres")
             @printf("\t%13s", "dres")
@@ -148,11 +148,15 @@ function run!(method::AdmmMaster)
             @printf("\t%8s", "tot time")
             @printf("\n")
         end
-        f, method.u = method.eval_f(method.ρ, method.v, method.λ)
+        f, u_dict = method.eval_f(method.ρ, method.v, method.λ)
         method.f = -sum(f)
-        if method.best_f < method.f
-            method.best_f = method.f
-            copy!(method.best_u, method.u)
+        # if method.best_f < method.f
+        #     method.best_f = method.f
+        #     copy!(method.best_u, method.u)
+        # end
+        method.u = zeros(method.num_vars)
+        for (id,vec) in u_dict
+            method.u += vec
         end
 
         master_stime = time()
@@ -168,7 +172,7 @@ function run!(method::AdmmMaster)
         total_time = time() - total_stime
 
         @printf("%6d", method.iter)
-        @printf("\t%+6e", method.best_f)
+        # @printf("\t%+6e", method.best_f)
         @printf("\t%+6e", method.f)
         @printf("\t%+6e", method.pres)
         @printf("\t%+6e", method.dres)
@@ -183,8 +187,8 @@ function run!(method::AdmmMaster)
     end
 end
 
-get_objective(method::AdmmMaster) = method.best_f
-get_solution(method::AdmmMaster) = method.best_u
+get_objective(method::AdmmMaster) = method.f
+get_solution(method::AdmmMaster) = method.u
 get_times(method::AdmmMaster)::Vector{Float64} = method.iteration_time
 function set_obj_limit!(method::AdmmMaster, val::Float64)
     method.obj_limit = val

@@ -32,7 +32,7 @@ mutable struct AdmmLagrangeDual <: AbstractLagrangeDual
         LD.constructor = constructor
         LD.optimizer = optimizer
         LD.params = params
-        LD.obj_limit = inf
+        LD.obj_limit = Inf
         
         LD.block_model = BlockModel()
         LD.var_to_index = Dict()
@@ -91,9 +91,6 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
 
     for (id,block) in block_model(LD)
         function solve_subproblem(u::Array{Float64,1})
-            # 
-            println("at block "*string(id))
-            # 
             @assert length(u) == length(LD.block_to_vars[id])
             for (i, var) in enumerate(LD.block_to_vars[id])
                 adjust_objective_function!(LD, var, u[i])
@@ -114,15 +111,16 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             end
     
             # Initialize subgradients
-            subgrad = zeros(length(u))
+            subgrad = Dict{Int,SparseVector{Float64}}()
+            subgrad[1] = sparsevec(Dict{Int,Float64}(), length(u))
             for (i, var) in enumerate(LD.block_to_vars[id])
-                subgrad[i] = -JuMP.value(var.ref)
+                subgrad[1][i] = -JuMP.value(var.ref)
             end
             for (i, var) in enumerate(LD.block_to_vars[id])
                 reset_objective_function!(LD, var, u[i])
             end
     
-            return objval, subgrad
+            return [objval], subgrad
         end
         num_coupling_variables = length(LD.block_to_vars[id])
         num_blocks = 1
@@ -139,7 +137,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
 
     function solveAdmmLagrangeDual(ρ::Float64, v:: Array{Float64,1}, λ::Array{Float64,1})
         @assert length(v) == num_all_coupling_variables
-        @assert length(λ) == length(LD.block_model.coupling_variables)
+        @assert length(λ) == length(LD.coupling_id_keys)
 
         # broadcast λ
         if parallel.is_root()
@@ -152,8 +150,6 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         subsolve_time = Dict{Int,Float64}()
 
         for (id, bm) in LD.bundlemethods
-
-            bm.ρ = ρ
             n = length(LD.block_to_vars[id])
             P = ρ * sparse(Matrix(1.0I, n, n))
             q = zeros(n)
@@ -171,6 +167,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
 
             objvals[id] = sum(bm.θ)
             newu = bm.y
+            us[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
             for (i, var) in enumerate(LD.block_to_vars[id])
                 idx = index_of_λ(LD, var)
                 us[id][idx] = newu[i]
@@ -203,7 +200,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
     end
 
     if parallel.is_root()
-        load!(LM, num_all_coupling_variables, num_all_blocks, solveAdmmLagrangeDual, initial_u)
+        load!(LM, num_all_coupling_variables, num_all_blocks, solveAdmmLagrangeDual, zeros(num_all_coupling_variables))
     
         # Add bounding constraints to the Lagrangian master
         add_constraints!(LD, LM)

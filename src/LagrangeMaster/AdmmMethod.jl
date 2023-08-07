@@ -27,14 +27,18 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     μ::Float64
     pres::Float64
     dres::Float64
-    tol::Float64
+    ϵ::Float64
 
     coupling_ids::Array{Array{Int}}
     constraint_matrix::Union{Nothing,SparseMatrixCSC{Float64,Int}}
 
     iteration_time::Vector{Float64}
 
-    function AdmmMaster()
+    residual_primal_list::Vector{Float64}
+    residual_dual_list::Vector{Float64}
+    penalty_list::Vector{Float64}
+
+    function AdmmMaster(;ρ=1.0, τ=2.0, ξ=10.0, μ=1.0, ϵ=1e-6)
         am = new()
         am.num_vars = 0
         am.num_functions = 0
@@ -52,17 +56,22 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.v = []
         am.v_old = []
         am.λ = []
-        am.ρ = 1.0
-        am.τ = 2.0
-        am.ξ = 10.0
-        am.μ = 1.0
+        am.ρ = ρ
+        am.τ = τ
+        am.ξ = ξ
+        am.μ = μ
         am.pres = 0.0
         am.dres = 1.0
-        am.tol = 1e-6
+        am.ϵ = ϵ
         am.coupling_ids = []
 
         am.constraint_matrix = nothing
         am.iteration_time = []
+
+        am.residual_primal_list = []
+        am.residual_dual_list = []
+        am.penalty_list = []
+        
         return am
     end
 end
@@ -171,6 +180,10 @@ function run!(method::AdmmMaster)
         total_master_time += time() - master_stime
         total_time = time() - total_stime
 
+        push!(method.residual_primal_list, method.pres)
+        push!(method.residual_dual_list, method.dres)
+        push!(method.penalty_list, method.ρ)
+
         @printf("%6d", method.iter)
         # @printf("\t%+6e", method.best_f)
         @printf("\t%+6e", method.f)
@@ -181,7 +194,7 @@ function run!(method::AdmmMaster)
         @printf("\t%8.2f", total_time)
         @printf("\n")
 
-        if max(method.pres, method.dres) < method.tol
+        if max(method.pres, method.dres) < method.ϵ
             break
         end
     end
@@ -192,4 +205,11 @@ get_solution(method::AdmmMaster) = method.u
 get_times(method::AdmmMaster)::Vector{Float64} = method.iteration_time
 function set_obj_limit!(method::AdmmMaster, val::Float64)
     method.obj_limit = val
+end
+
+
+function write_all(LM::AdmmMaster; dir = ".")
+    write_file!(LM.residual_primal_list, "residual_primal.txt", dir)
+    write_file!(LM.residual_dual_list, "residual_dual.txt", dir)
+    write_file!(LM.penalty_list, "penalty.txt", dir)
 end

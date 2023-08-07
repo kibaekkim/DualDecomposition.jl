@@ -218,7 +218,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         LD.block_model.dual_solution = get_solution(LM)
 
         # broadcast we are done.
-        parallel.bcast(Float64[])
+        parallel.bcast((nothing, Float64[], Float64[]))
     else
         (ρ,v,λ) = parallel.bcast(nothing)
         while length(λ) > 0
@@ -226,4 +226,16 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             (ρ,v,λ) = parallel.bcast(nothing)
         end
     end
+end
+
+
+function write_times(LD::AdmmLagrangeDual; dir = ".")
+    write_file!(LD.subsolve_time, "subsolve_time", dir)
+    write_file!(LD.subcomm_time, "subcomm_time.txt", dir)
+    write_file!(LD.master_time, "master_time.txt", dir)
+end
+
+function write_all(LD::AdmmLagrangeDual; dir = ".")
+    write_times(LD, dir = dir)
+    write_file!(LD.subobj_value, "subobj_value.txt", dir)
 end

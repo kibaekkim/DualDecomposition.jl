@@ -144,7 +144,7 @@ end
 DD.set_coupling_variables!(algo, coupling_variables)
 
 # Lagrange master method
-LM = DD.AdmmMaster(ρ=rho, ϵ=tol)
+LM = DD.AdmmMaster(ρ=rho, ϵ=tol, maxiter=10000)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)

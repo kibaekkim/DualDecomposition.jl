@@ -38,13 +38,15 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     residual_dual_list::Vector{Float64}
     penalty_list::Vector{Float64}
 
-    function AdmmMaster(;ρ=1.0, τ=2.0, ξ=10.0, μ=1.0, ϵ=1e-6)
+    wallclock_time::Vector{Float64}
+
+    function AdmmMaster(;ρ=1.0, τ=2.0, ξ=10.0, μ=1.0, ϵ=1e-6, maxiter=1000)
         am = new()
         am.num_vars = 0
         am.num_functions = 0
         am.eval_f = nothing
         am.iter = 0
-        am.maxiter = 1000
+        am.maxiter = maxiter
         am.obj_limit = +Inf
 
         am.f = -Inf
@@ -71,6 +73,8 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.residual_primal_list = []
         am.residual_dual_list = []
         am.penalty_list = []
+
+        am.wallclock_time = []
         
         return am
     end
@@ -183,6 +187,7 @@ function run!(method::AdmmMaster)
         push!(method.residual_primal_list, method.pres)
         push!(method.residual_dual_list, method.dres)
         push!(method.penalty_list, method.ρ)
+        push!(method.wallclock_time, total_time)
 
         @printf("%6d", method.iter)
         # @printf("\t%+6e", method.best_f)
@@ -207,8 +212,12 @@ function set_obj_limit!(method::AdmmMaster, val::Float64)
     method.obj_limit = val
 end
 
+function write_times(LM::AdmmMaster; dir = ".")
+    write_file!(LM.wallclock_time, "wall_clock_time.txt", dir)
+end
 
 function write_all(LM::AdmmMaster; dir = ".")
+    write_times(LM, dir = dir)
     write_file!(LM.residual_primal_list, "residual_primal.txt", dir)
     write_file!(LM.residual_dual_list, "residual_dual.txt", dir)
     write_file!(LM.penalty_list, "penalty.txt", dir)

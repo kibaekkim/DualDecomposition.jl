@@ -46,7 +46,7 @@ mutable struct AdmmLagrangeDual <: AbstractLagrangeDual
         LD.subcomm_time = []
         LD.subobj_value = []
         LD.master_time = []
-        
+
         return LD
     end
 end

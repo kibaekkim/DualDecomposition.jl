@@ -77,7 +77,7 @@ rho = parsed_args["rho"]
 tol = parsed_args["tol"]
 seed::Int = 1
 # function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
-dir = "./nJ_$nJ/nI_$nI/nS_$nS"
+dir = "./admm/nJ_$nJ/nI_$nI/nS_$nS"
 mkpath(dir)
 
 Random.seed!(seed)

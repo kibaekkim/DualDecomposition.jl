@@ -56,10 +56,6 @@ function parse_commandline()
             help = "number of scenarios"
             arg_type = Int
             default = 50
-        "--rho"
-            help = "initial penalgy value"
-            arg_type = Float64
-            default = 1.0
         "--tol"
             help = "ADMM tolerance level"
             arg_type = Float64
@@ -73,7 +69,6 @@ parsed_args = parse_commandline()
 nJ = parsed_args["nJ"]
 nI = parsed_args["nI"]
 nS = parsed_args["nS"]
-rho = parsed_args["rho"]
 tol = parsed_args["tol"]
 seed::Int = 1
 # function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
@@ -144,7 +139,9 @@ end
 DD.set_coupling_variables!(algo, coupling_variables)
 
 # Lagrange master method
-LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+params = BM.Parameters()
+BM.set_parameter(params, "ϵ_s", tol)
+LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params=params)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)

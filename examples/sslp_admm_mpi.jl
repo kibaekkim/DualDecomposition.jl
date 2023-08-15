@@ -79,6 +79,7 @@ end
 
 parsed_args = parse_commandline()
 
+alg = parsed_args["alg"]
 nJ = parsed_args["nJ"]
 nI = parsed_args["nI"]
 nS = parsed_args["nS"]

@@ -44,6 +44,15 @@ const parallel = DD.parallel
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
+        "--alg"
+            help = "algorithm mode:\n
+                    -0: constant ρ\n
+                    -1: residual balancing\n
+                    -2: adaptive residual balancing\n
+                    -3: relaxed ADMM\n
+                    -4: adaptive relaxed ADMM"
+            arg_type = Int
+            default = 1
         "--nJ"
             help = "number of servers"
             arg_type = Int
@@ -144,7 +153,7 @@ end
 DD.set_coupling_variables!(algo, coupling_variables)
 
 # Lagrange master method
-LM = DD.AdmmMaster(ρ=rho, ϵ=tol, maxiter=10000)
+LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=10000)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)

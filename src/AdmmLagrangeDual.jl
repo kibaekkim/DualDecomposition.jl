@@ -23,6 +23,8 @@ mutable struct AdmmLagrangeDual <: AbstractLagrangeDual
     bundlemethods::Dict{Int,BM.BasicMethod}
     # heuristics::Vector{Type}
     subsolve_time::Vector{Dict{Int,Float64}}
+    bundle_time::Vector{Dict{Int,Float64}}
+    eval_time::Vector{Dict{Int,Float64}}
     subcomm_time::Vector{Float64}
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
@@ -43,9 +45,12 @@ mutable struct AdmmLagrangeDual <: AbstractLagrangeDual
         LD.bundlemethods = Dict()
         # LD.heuristics = []
         LD.subsolve_time = []
+        LD.bundle_time = []
+        LD.eval_time = []
         LD.subcomm_time = []
         LD.subobj_value = []
         LD.master_time = []
+
 
         return LD
     end
@@ -148,6 +153,8 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         objvals = Dict{Int,Float64}()
         us = Dict{Int,SparseVector{Float64}}()
         subsolve_time = Dict{Int,Float64}()
+        bundle_time = Dict{Int,Float64}()
+        eval_time = Dict{Int,Float64}()
 
         for (id, bm) in LD.bundlemethods
             n = length(LD.block_to_vars[id])
@@ -164,6 +171,10 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             stime = time()
             BM.run!(bm)
             subsolve_time[id] = time() - stime
+            bundle_time[id] = sum(bm.model.time)
+            bm.model.time = []
+            eval_time[id] = copy(bm.statistics["total_eval_time"])
+            bm.statistics["total_eval_time"] = 0.0
 
             objvals[id] = sum(bm.θ)
             newu = bm.y
@@ -174,6 +185,8 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             end
         end
         push!(LD.subsolve_time, subsolve_time)
+        push!(LD.bundle_time, bundle_time)
+        push!(LD.eval_time, eval_time)
 
 
         parallel.barrier()
@@ -233,6 +246,8 @@ function write_times(LD::AdmmLagrangeDual; dir = ".")
     write_file!(LD.subsolve_time, "subsolve_time", dir)
     write_file!(LD.subcomm_time, "subcomm_time.txt", dir)
     write_file!(LD.master_time, "master_time.txt", dir)
+    write_file!(LD.bundle_time, "bundle_time", dir)
+    write_file!(LD.eval_time, "eval_time", dir)
 end
 
 function write_all(LD::AdmmLagrangeDual; dir = ".")

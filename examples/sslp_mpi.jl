@@ -72,8 +72,6 @@ nS = parsed_args["nS"]
 tol = parsed_args["tol"]
 seed::Int = 1
 # function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
-dir = "./prox/nJ_$nJ/nI_$nI/nS_$nS"
-mkpath(dir)
 
 Random.seed!(seed)
 
@@ -146,7 +144,7 @@ LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimize
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)
 
-DD.write_all(algo, dir=dir)
+DD.write_all(algo)
 
 if (parallel.is_root())
   @show DD.primal_objective_value(algo)

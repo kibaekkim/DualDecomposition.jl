@@ -164,5 +164,12 @@ DD.run!(algo, LM)
 DD.write_all(algo, dir=dir)
 DD.write_all(LM, dir=dir)
 
+if (parallel.is_root())
+    @show DD.primal_objective_value(algo)
+    @show DD.dual_objective_value(algo)
+    @show DD.primal_solution(algo)
+    @show DD.dual_solution(algo)
+end
+
 # Finalize MPI
 parallel.finalize()

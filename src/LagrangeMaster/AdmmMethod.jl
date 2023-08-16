@@ -16,6 +16,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
 
     iter::Int # current iteration count
     maxiter::Int
+    maxtime::Float64
     obj_limit::Float64
 
     f::Float64
@@ -65,7 +66,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
 
     wallclock_time::Vector{Float64}
 
-    function AdmmMaster(;alg=1, ρ=1.0, ϵ=1e-6, maxiter=1000)
+    function AdmmMaster(;alg=1, ρ=1.0, ϵ=1e-6, maxiter=1000, maxtime=3600.0)
         am = new()
         am.alg = alg
         am.num_vars = 0
@@ -73,6 +74,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.eval_f = nothing
         am.iter = 0
         am.maxiter = maxiter
+        am.maxtime = maxtime
         am.obj_limit = +Inf
 
         am.f = -Inf
@@ -373,6 +375,10 @@ function run!(method::AdmmMaster)
         @printf("\n")
 
         if max(method.pres, method.dres) < method.ϵ
+            break
+        end
+        if total_time > method.maxtime
+            @printf("Time limit reached")
             break
         end
     end

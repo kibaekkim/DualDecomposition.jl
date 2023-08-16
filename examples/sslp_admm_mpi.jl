@@ -164,6 +164,7 @@ LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=1000)
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)
 
+mkpath(dir)
 DD.write_all(algo, dir=dir)
 DD.write_all(LM, dir=dir)
 

@@ -149,6 +149,7 @@ LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimize
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)
 
+mkpath(dir)
 DD.write_all(algo, dir=dir)
 
 if (parallel.is_root())

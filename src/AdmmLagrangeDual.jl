@@ -25,6 +25,7 @@ mutable struct AdmmLagrangeDual <: AbstractLagrangeDual
     subsolve_time::Vector{Dict{Int,Float64}}
     bundle_time::Vector{Dict{Int,Float64}}
     eval_time::Vector{Dict{Int,Float64}}
+    num_cuts::Vector{Dict{Int,Int}}
     subcomm_time::Vector{Float64}
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
@@ -47,6 +48,7 @@ mutable struct AdmmLagrangeDual <: AbstractLagrangeDual
         LD.subsolve_time = []
         LD.bundle_time = []
         LD.eval_time = []
+        LD.num_cuts = []
         LD.subcomm_time = []
         LD.subobj_value = []
         LD.master_time = []
@@ -155,6 +157,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         subsolve_time = Dict{Int,Float64}()
         bundle_time = Dict{Int,Float64}()
         eval_time = Dict{Int,Float64}()
+        num_cuts = Dict{Int, Int}()
 
         for (id, bm) in LD.bundlemethods
             n = length(LD.block_to_vars[id])
@@ -175,6 +178,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             bm.model.time = []
             eval_time[id] = copy(bm.statistics["total_eval_time"])
             bm.statistics["total_eval_time"] = 0.0
+            num_cuts[id] = length(bm.cuts)
 
             objvals[id] = sum(bm.θ)
             newu = bm.y
@@ -187,6 +191,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         push!(LD.subsolve_time, subsolve_time)
         push!(LD.bundle_time, bundle_time)
         push!(LD.eval_time, eval_time)
+        push!(LD.num_cuts, num_cuts)
 
 
         parallel.barrier()
@@ -248,6 +253,7 @@ function write_times(LD::AdmmLagrangeDual; dir = ".")
     write_file!(LD.master_time, "master_time.txt", dir)
     write_file!(LD.bundle_time, "bundle_time", dir)
     write_file!(LD.eval_time, "eval_time", dir)
+    write_file!(LD.num_cuts, "num_cuts", dir)
 end
 
 function write_all(LD::AdmmLagrangeDual; dir = ".")

@@ -60,6 +60,10 @@ function parse_commandline()
             help = "ADMM tolerance level"
             arg_type = Float64
             default = 1e-6
+        "--dir"
+            help = "output directory"
+            arg_type = String
+            default = "."
     end
     return parse_args(s)
 end
@@ -70,6 +74,7 @@ nJ = parsed_args["nJ"]
 nI = parsed_args["nI"]
 nS = parsed_args["nS"]
 tol = parsed_args["tol"]
+dir = parsed_args["dir"]
 seed::Int = 1
 # function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
 
@@ -144,7 +149,7 @@ LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimize
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)
 
-DD.write_all(algo)
+DD.write_all(algo, dir=dir)
 
 if (parallel.is_root())
   @show DD.primal_objective_value(algo)

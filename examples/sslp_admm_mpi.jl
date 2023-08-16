@@ -73,6 +73,10 @@ function parse_commandline()
             help = "ADMM tolerance level"
             arg_type = Float64
             default = 1e-6
+        "--dir"
+            help = "output directory"
+            arg_type = String
+            default = "."
     end
     return parse_args(s)
 end
@@ -85,6 +89,7 @@ nI = parsed_args["nI"]
 nS = parsed_args["nS"]
 rho = parsed_args["rho"]
 tol = parsed_args["tol"]
+dir = parsed_args["dir"]
 seed::Int = 1
 # function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
 
@@ -154,13 +159,13 @@ end
 DD.set_coupling_variables!(algo, coupling_variables)
 
 # Lagrange master method
-LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=10000)
+LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=1000)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)
 
-DD.write_all(algo)
-DD.write_all(LM)
+DD.write_all(algo, dir=dir)
+DD.write_all(LM, dir=dir)
 
 if (parallel.is_root())
     @show DD.primal_objective_value(algo)

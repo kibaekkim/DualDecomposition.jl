@@ -37,7 +37,9 @@ function create_scenario_model(s::Int64)
 end
 
 # Create DualDecomposition instance.
-algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+params = BM.Parameters()
+BM.set_parameter(params, "print_output", false)
+algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
 
 # Add Lagrange dual problem for each scenario s.
 models = Dict{Int,JuMP.Model}(s => create_scenario_model(s) for s in 1:NS)

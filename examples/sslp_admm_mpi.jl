@@ -130,7 +130,9 @@ parallel.init()
 println("ID: $(parallel.myid()) out of $(parallel.nprocs())")
 
 # Create DualDecomposition instance.
-algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+params = BM.Parameters()
+BM.set_parameter(params, "print_output", false)
+algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
 
 # partition scenarios into processes
 parallel.partition(nS)

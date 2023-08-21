@@ -20,7 +20,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     obj_limit::Float64
 
     f::Float64
-    # best_f::Float64
+    final_f::Float64
     u::Vector{Float64}
     u_old::Vector{Float64}
     best_u::Vector{Float64}
@@ -78,7 +78,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.obj_limit = +Inf
 
         am.f = -Inf
-        # am.best_f = -Inf
+        am.final_f = -Inf
         am.u = []
         am.u_old = []
         am.best_u = []
@@ -234,7 +234,7 @@ function run!(method::AdmmMaster)
             @printf("\t%8s", "tot time")
             @printf("\n")
         end
-        f, u_dict = method.eval_f(method.ρ, method.v, method.λ)
+        f, u_dict = method.eval_f(method.ρ, method.v, method.λ, false)
         method.f = -sum(f)
         # if method.best_f < method.f
         #     method.best_f = method.f
@@ -382,9 +382,11 @@ function run!(method::AdmmMaster)
             break
         end
     end
+    f, u_dict = method.eval_f(method.ρ, method.v, method.λ, true)
+    method.final_f = -sum(f)
 end
 
-get_objective(method::AdmmMaster) = method.f
+get_objective(method::AdmmMaster) = method.final_f
 get_solution(method::AdmmMaster) = method.u
 get_times(method::AdmmMaster)::Vector{Float64} = method.iteration_time
 function set_obj_limit!(method::AdmmMaster, val::Float64)

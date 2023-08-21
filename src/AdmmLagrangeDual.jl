@@ -142,13 +142,13 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         BM.set_obj_limit(LD.bundlemethods[id], -LD.obj_limit)
     end
 
-    function solveAdmmLagrangeDual(ρ::Float64, v:: Array{Float64,1}, λ::Array{Float64,1})
+    function solveAdmmLagrangeDual(ρ::Float64, v:: Array{Float64,1}, λ::Array{Float64,1}, eval::Bool)
         @assert length(v) == num_all_coupling_variables
         @assert length(λ) == length(LD.coupling_id_keys)
 
         # broadcast λ
         if parallel.is_root()
-            parallel.bcast((ρ,v,λ))
+            parallel.bcast((ρ,v,λ,eval))
         end
 
         # output
@@ -161,37 +161,54 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
 
         for (id, bm) in LD.bundlemethods
             n = length(LD.block_to_vars[id])
-            P = ρ * sparse(Matrix(1.0I, n, n))
-            q = zeros(n)
-            for (i, var) in enumerate(LD.block_to_vars[id])
-                idx = index_of_λ(LD, var)
-                ci  = LD.coupling_id_dict[var.key.coupling_id]
-                q[i] = λ[ci] - ρ * v[idx]
-            end
-            q = sparse(q)
-            BM.update_objective!(bm, P, q)
+            if (eval)
+                v_loc = zeros(n)
+                for (i, var) in enumerate(LD.block_to_vars[id])
+                    idx = index_of_λ(LD, var)
+                    v_loc[i] = v[idx]
+                end
+                fy, g = bm.model.evaluate_f(v_loc)
+                objvals[id] = sum(fy)
+                us[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+                for (i, var) in enumerate(LD.block_to_vars[id])
+                    idx = index_of_λ(LD, var)
+                    us[id][idx] = 0.0
+                end
+            else
+                P = ρ * sparse(Matrix(1.0I, n, n))
+                q = zeros(n)
+                for (i, var) in enumerate(LD.block_to_vars[id])
+                    idx = index_of_λ(LD, var)
+                    ci  = LD.coupling_id_dict[var.key.coupling_id]
+                    q[i] = λ[ci] - ρ * v[idx]
+                end
+                q = sparse(q)
+                BM.update_objective!(bm, P, q)
+                stime = time()
 
-            stime = time()
-            BM.run!(bm)
-            subsolve_time[id] = time() - stime
-            bundle_time[id] = sum(bm.model.time)
-            bm.model.time = []
-            eval_time[id] = copy(bm.statistics["total_eval_time"])
-            bm.statistics["total_eval_time"] = 0.0
-            num_cuts[id] = length(bm.cuts)
+                BM.run!(bm)
+                subsolve_time[id] = time() - stime
+                bundle_time[id] = sum(bm.model.time)
+                bm.model.time = []
+                eval_time[id] = copy(bm.statistics["total_eval_time"])
+                bm.statistics["total_eval_time"] = 0.0
+                num_cuts[id] = length(bm.cuts)
 
-            objvals[id] = sum(bm.θ)
-            newu = bm.y
-            us[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
-            for (i, var) in enumerate(LD.block_to_vars[id])
-                idx = index_of_λ(LD, var)
-                us[id][idx] = newu[i]
+                objvals[id] = sum(bm.θ)
+                newu = bm.y
+                us[id] = sparsevec(Dict{Int,Float64}(), num_all_coupling_variables)
+                for (i, var) in enumerate(LD.block_to_vars[id])
+                    idx = index_of_λ(LD, var)
+                    us[id][idx] = newu[i]
+                end
             end
         end
-        push!(LD.subsolve_time, subsolve_time)
-        push!(LD.bundle_time, bundle_time)
-        push!(LD.eval_time, eval_time)
-        push!(LD.num_cuts, num_cuts)
+        if (!eval)
+            push!(LD.subsolve_time, subsolve_time)
+            push!(LD.bundle_time, bundle_time)
+            push!(LD.eval_time, eval_time)
+            push!(LD.num_cuts, num_cuts)
+        end
 
 
         parallel.barrier()
@@ -236,12 +253,12 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         LD.block_model.dual_solution = get_solution(LM)
 
         # broadcast we are done.
-        parallel.bcast((nothing, Float64[], Float64[]))
+        parallel.bcast((nothing, Float64[], Float64[], nothing))
     else
-        (ρ,v,λ) = parallel.bcast(nothing)
+        (ρ,v,λ,eval) = parallel.bcast(nothing)
         while length(λ) > 0
-            solveAdmmLagrangeDual(ρ, v, λ)
-            (ρ,v,λ) = parallel.bcast(nothing)
+            solveAdmmLagrangeDual(ρ, v, λ, eval)
+            (ρ,v,λ,eval) = parallel.bcast(nothing)
         end
     end
 end

@@ -23,7 +23,8 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     final_f::Float64
     u::Vector{Float64}
     u_old::Vector{Float64}
-    best_u::Vector{Float64}
+    best_sol::Vector{Float64}
+    best_res::Float64
 
     u_mean::Vector{Float64}
     v::Vector{Float64}
@@ -84,7 +85,8 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.final_f = -Inf
         am.u = []
         am.u_old = []
-        am.best_u = []
+        am.best_sol = []
+        am.best_res = +Inf
 
         am.u_mean = []
         am.v = []
@@ -139,7 +141,7 @@ function load!(method::AdmmMaster, num_coupling_variables::Int, num_blocks::Int,
     method.num_functions = num_blocks
     method.eval_f = eval_function
     method.u = init_sol
-    method.best_u = init_sol
+    method.best_sol = init_sol
 
 end
 
@@ -232,8 +234,8 @@ function run!(method::AdmmMaster)
         if method.iter % 100 == 1
             @printf("%6s", "Iter")
             @printf("%8s", "Valid")
-            # @printf("\t%13s", "fbest")
             @printf("\t%13s", "f")
+            @printf("\t%13s", "best res")
             @printf("\t%13s", "pres")
             @printf("\t%13s", "dres")
             @printf("\t%13s", "ρ")
@@ -243,10 +245,7 @@ function run!(method::AdmmMaster)
         end
         f, u_dict, status_dict = method.eval_f(method.ρ, method.v, method.λ, false)
         method.f = -sum(f)
-        # if method.best_f < method.f
-        #     method.best_f = method.f
-        #     copy!(method.best_u, method.u)
-        # end
+
         copy!(method.u_old, method.u)
         method.u = zeros(method.num_vars)
         for (id,vec) in u_dict
@@ -381,14 +380,19 @@ function run!(method::AdmmMaster)
 
         @printf("%6d", method.iter)
         @printf("%8s", method.valid_step ? "valid" : "invalid")
-        # @printf("\t%+6e", method.best_f)
         @printf("\t%+6e", method.f)
+        @printf("\t%+6e", method.best_res)
         @printf("\t%+6e", method.pres)
         @printf("\t%+6e", method.dres)
         @printf("\t%+6e", method.ρ)
         @printf("\t%7.2f", total_master_time)
         @printf("\t%8.2f", total_time)
         @printf("\n")
+
+        if max(method.pres, method.dres) < method.best_res && method.valid_step_prev && method.valid_step
+            method.best_res = max(method.pres, method.dres)
+            copy!(method.best_sol, method.v)
+        end
 
         if max(method.pres, method.dres) < method.ϵ && method.valid_step_prev && method.valid_step
             break
@@ -398,12 +402,12 @@ function run!(method::AdmmMaster)
             break
         end
     end
-    f, u_dict, status_dict = method.eval_f(method.ρ, method.v, method.λ, true)
+    f, u_dict, status_dict = method.eval_f(method.ρ, method.best_sol, method.λ, true)
     method.final_f = -sum(f)
 end
 
 get_objective(method::AdmmMaster) = method.final_f
-get_solution(method::AdmmMaster) = method.u
+get_solution(method::AdmmMaster) = method.best_sol
 get_times(method::AdmmMaster)::Vector{Float64} = method.iteration_time
 function set_obj_limit!(method::AdmmMaster, val::Float64)
     method.obj_limit = val

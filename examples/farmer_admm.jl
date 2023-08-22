@@ -39,6 +39,7 @@ end
 # Create DualDecomposition instance.
 params = BM.Parameters()
 BM.set_parameter(params, "print_output", false)
+# BM.set_parameter(params, "maxiter", 1) #inexact admm
 algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
 
 # Add Lagrange dual problem for each scenario s.

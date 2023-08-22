@@ -233,7 +233,7 @@ function run!(method::AdmmMaster)
         method.iter += 1
         if method.iter % 100 == 1
             @printf("%6s", "Iter")
-            @printf("%8s", "Valid")
+            @printf("%8s", "status")
             @printf("\t%13s", "f")
             @printf("\t%13s", "best res")
             @printf("\t%13s", "pres")

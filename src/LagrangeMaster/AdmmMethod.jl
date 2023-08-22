@@ -35,6 +35,9 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     dres::Float64
     ϵ::Float64
 
+    valid_step::Bool
+    valid_step_prev::Bool
+
     #1: residual balancing
     τ::Float64
     ξ::Float64
@@ -92,6 +95,9 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.pres = 0.0
         am.dres = 1.0
         am.ϵ = ϵ
+
+        am.valid_step = false
+        am.valid_step_prev = false
         
         #1: residual balancing
         am.τ = 2.0
@@ -225,6 +231,7 @@ function run!(method::AdmmMaster)
         method.iter += 1
         if method.iter % 100 == 1
             @printf("%6s", "Iter")
+            @printf("%8s", "Valid")
             # @printf("\t%13s", "fbest")
             @printf("\t%13s", "f")
             @printf("\t%13s", "pres")
@@ -234,7 +241,7 @@ function run!(method::AdmmMaster)
             @printf("\t%8s", "tot time")
             @printf("\n")
         end
-        f, u_dict = method.eval_f(method.ρ, method.v, method.λ, false)
+        f, u_dict, status_dict = method.eval_f(method.ρ, method.v, method.λ, false)
         method.f = -sum(f)
         # if method.best_f < method.f
         #     method.best_f = method.f
@@ -244,6 +251,14 @@ function run!(method::AdmmMaster)
         method.u = zeros(method.num_vars)
         for (id,vec) in u_dict
             method.u += vec
+        end
+        method.valid_step_prev = method.valid_step
+        method.valid_step = true
+        for (id, status) in status_dict
+            if status != 1 # (1=optimal)
+                method.valid_step = false
+                break
+            end
         end
 
         master_stime = time()
@@ -365,6 +380,7 @@ function run!(method::AdmmMaster)
         push!(method.wallclock_time, total_time)
 
         @printf("%6d", method.iter)
+        @printf("%8s", method.valid_step ? "valid" : "invalid")
         # @printf("\t%+6e", method.best_f)
         @printf("\t%+6e", method.f)
         @printf("\t%+6e", method.pres)
@@ -374,7 +390,7 @@ function run!(method::AdmmMaster)
         @printf("\t%8.2f", total_time)
         @printf("\n")
 
-        if max(method.pres, method.dres) < method.ϵ
+        if max(method.pres, method.dres) < method.ϵ && method.valid_step_prev && method.valid_step
             break
         end
         if total_time > method.maxtime
@@ -382,7 +398,7 @@ function run!(method::AdmmMaster)
             break
         end
     end
-    f, u_dict = method.eval_f(method.ρ, method.v, method.λ, true)
+    f, u_dict, status_dict = method.eval_f(method.ρ, method.v, method.λ, true)
     method.final_f = -sum(f)
 end
 

@@ -154,6 +154,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         # output
         objvals = Dict{Int,Float64}()
         us = Dict{Int,SparseVector{Float64}}()
+        statuses = Dict{Int,Int}()
         subsolve_time = Dict{Int,Float64}()
         bundle_time = Dict{Int,Float64}()
         eval_time = Dict{Int,Float64}()
@@ -174,6 +175,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
                     idx = index_of_λ(LD, var)
                     us[id][idx] = 0.0
                 end
+                statuses[id] = false
             else
                 P = ρ * sparse(Matrix(1.0I, n, n))
                 q = zeros(n)
@@ -201,6 +203,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
                     idx = index_of_λ(LD, var)
                     us[id][idx] = newu[i]
                 end
+                statuses[id] = bm.status
             end
         end
         if (!eval)
@@ -225,13 +228,14 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         end
 
         us_combined = parallel.combine_dict(us)
+        statuses_combined = parallel.combine_dict(statuses)
 
         if parallel.is_root()
             push!(LD.subcomm_time, time() - comm_time)
             # @printf("Subproblem sommunication time: %6.1f sec.\n", time() - comm_time)
         end
 
-        return objvals_vec, us_combined
+        return objvals_vec, us_combined, statuses_combined
     end
 
     if parallel.is_root()

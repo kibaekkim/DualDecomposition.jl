@@ -378,6 +378,11 @@ function run!(method::AdmmMaster)
         end
         push!(method.wallclock_time, total_time)
 
+        if max(method.pres, method.dres) < method.best_res && method.valid_step_prev && method.valid_step
+            method.best_res = max(method.pres, method.dres)
+            copy!(method.best_sol, method.v)
+        end
+
         @printf("%6d", method.iter)
         @printf("%8s", method.valid_step ? "valid" : "invalid")
         @printf("\t%+6e", method.f)
@@ -388,11 +393,6 @@ function run!(method::AdmmMaster)
         @printf("\t%7.2f", total_master_time)
         @printf("\t%8.2f", total_time)
         @printf("\n")
-
-        if max(method.pres, method.dres) < method.best_res && method.valid_step_prev && method.valid_step
-            method.best_res = max(method.pres, method.dres)
-            copy!(method.best_sol, method.v)
-        end
 
         if max(method.pres, method.dres) < method.ϵ && method.valid_step_prev && method.valid_step
             break

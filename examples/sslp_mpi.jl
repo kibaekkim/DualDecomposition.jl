@@ -115,7 +115,6 @@ end
 
 # Initialize MPI
 parallel.init()
-println("ID: $(parallel.myid()) out of $(parallel.nprocs())")
 
 # Create DualDecomposition instance.
 algo = DD.LagrangeDual()

@@ -66,7 +66,7 @@ function parse_commandline()
             arg_type = Int
             default = 50
         "--rho"
-            help = "initial penalgy value"
+            help = "initial penalty value"
             arg_type = Float64
             default = 1.0
         "--tol"
@@ -130,7 +130,6 @@ end
 
 # Initialize MPI
 parallel.init()
-println("ID: $(parallel.myid()) out of $(parallel.nprocs())")
 
 # Create DualDecomposition instance.
 params = BM.Parameters()

@@ -114,7 +114,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         #4: adaptive relaxed ADMM
         am.Tf = 2
         am.ϵ_cor = 0.2
-        am.C_cg = 1e3
+        am.C_cg = maxiter*maxiter
         am.u_k0 = []
         am.v_k0 = []
         am.λ_k0 = []

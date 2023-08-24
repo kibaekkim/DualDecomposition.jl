@@ -171,6 +171,7 @@ DD.run!(algo, LM)
 
 mkpath(dir)
 DD.write_all(algo, dir=dir)
+DD.write_all(LM, dir=dir)
 
 if (parallel.is_root())
   @show DD.primal_objective_value(algo)

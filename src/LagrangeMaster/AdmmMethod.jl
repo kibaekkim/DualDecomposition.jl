@@ -68,7 +68,9 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     τ_list::Vector{Float64}
     γ_list::Vector{Float64}
     α_list::Vector{Float64}
+    αcor_list::Vector{Float64}
     β_list::Vector{Float64}
+    βcor_list::Vector{Float64}
 
     wallclock_time::Vector{Float64}
 
@@ -132,7 +134,9 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.τ_list = []
         am.γ_list = []
         am.α_list = []
+        am.αcor_list = []
         am.β_list = []
+        am.βcor_list = []
 
         am.wallclock_time = []
         
@@ -337,11 +341,15 @@ function run!(method::AdmmMaster)
             else
                 β = β_SD - β_MG/2
             end
-            push!(method.α_list,α)
-            push!(method.β_list,β)
 
             α_cor = DhDλ / sqrt(DhDh * DλDλ)
             β_cor = DgDλ / sqrt(DgDg * DλDλ)
+
+            push!(method.α_list,α)
+            push!(method.β_list,β)
+            push!(method.αcor_list,α_cor)
+            push!(method.βcor_list,β_cor)
+
 
             if α_cor > method.ϵ_cor && β_cor > method.ϵ_cor
                 ρ_hat = sqrt(α * β)
@@ -434,6 +442,8 @@ function write_all(LM::AdmmMaster; dir = ".")
     if (LM.alg == 4)
         write_file!(LM.α_list, "alpha.txt", dir)
         write_file!(LM.β_list, "beta.txt", dir)
+        write_file!(LM.αcor_list, "alpha_cor.txt", dir)
+        write_file!(LM.βcor_list, "beta_cor.txt", dir)
         write_file!(LM.γ_list, "relaxation.txt", dir)
     end
 end

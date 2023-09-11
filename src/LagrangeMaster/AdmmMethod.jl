@@ -67,6 +67,8 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     penalty_list::Vector{Float64}
     τ_list::Vector{Float64}
     γ_list::Vector{Float64}
+    α_list::Vector{Float64}
+    β_list::Vector{Float64}
 
     wallclock_time::Vector{Float64}
 
@@ -129,6 +131,8 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.penalty_list = []
         am.τ_list = []
         am.γ_list = []
+        am.α_list = []
+        am.β_list = []
 
         am.wallclock_time = []
         
@@ -333,6 +337,8 @@ function run!(method::AdmmMaster)
             else
                 β = β_SD - β_MG/2
             end
+            push!(method.α_list,α)
+            push!(method.β_list,β)
 
             α_cor = DhDλ / sqrt(DhDh * DλDλ)
             β_cor = DgDλ / sqrt(DgDg * DλDλ)
@@ -426,6 +432,8 @@ function write_all(LM::AdmmMaster; dir = ".")
         write_file!(LM.τ_list, "penalty_multiplier.txt", dir)
     end
     if (LM.alg == 4)
+        write_file!(LM.α_list, "alpha.txt", dir)
+        write_file!(LM.β_list, "beta.txt", dir)
         write_file!(LM.γ_list, "relaxation.txt", dir)
     end
 end

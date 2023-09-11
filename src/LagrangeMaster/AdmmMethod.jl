@@ -56,6 +56,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     u_k0::Vector{Float64}
     v_k0::Vector{Float64}
     λ_k0::Vector{Float64}
+    λhat_k0::Vector{Float64}
 
     coupling_ids::Array{Array{Int}}
     constraint_matrix::Union{Nothing,SparseMatrixCSC{Float64,Int}}
@@ -122,6 +123,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.u_k0 = []
         am.v_k0 = []
         am.λ_k0 = []
+        am.λhat_k0 = []
 
         am.coupling_ids = []
 
@@ -174,7 +176,8 @@ function add_constraints!(LD::AbstractLagrangeDual, method::AdmmMaster)
         update_w_mean!(method, method.w)
         method.u_k0 = zeros(method.num_vars)
         method.v_k0 = zeros(method.num_vars)
-        method.λ_k0 = zeros(method.num_vars)
+        method.λ_k0 = zeros(length(method.coupling_ids))
+        method.λhat_k0 = zeros(method.num_vars)
     end
 end
 
@@ -318,18 +321,27 @@ function run!(method::AdmmMaster)
 
             Dh_hat = method.u_old - method.u_k0
             Dg_hat = method.v_old - method.v_k0
-            Dλ_hat =        λ_hat - method.λ_k0
+            Dλ     = zeros(Float64,method.num_vars)
+            for i in 1:length(method.coupling_ids)
+                for idx in method.coupling_ids[i]
+                    Dλ[idx] = method.λ[i] - method.λ_k0[i]
+                end
+            end
+            Dλ_hat =        λ_hat - method.λhat_k0
 
-            DhDh = Dh_hat' * Dh_hat
-            DgDg = Dg_hat' * Dg_hat
-            DλDλ = Dλ_hat' * Dλ_hat
-            DhDλ = Dh_hat' * Dλ_hat
-            DgDλ = Dg_hat' * Dλ_hat
+            DhhDhh = Dh_hat' * Dh_hat
+            DghDgh = Dg_hat' * Dg_hat
+            DλDλ   = Dλ'     * Dλ
+            # DhhDλ  = Dh_hat' * Dλ
+            DghDλ  = Dg_hat' * Dλ
+            DλhDλh = Dλ_hat' * Dλ_hat
+            DhhDλh = Dh_hat' * Dλ_hat
+            # DghDλh = Dg_hat' * Dλ_hat
 
-            α_SD = DλDλ / DhDλ
-            α_MG = DhDλ / DhDh
-            β_SD = DλDλ / DgDλ
-            β_MG = DgDλ / DgDg
+            α_SD = DλhDλh / DhhDλh
+            α_MG = DhhDλh / DhhDhh
+            β_SD = DλDλ   / DghDλ
+            β_MG = DghDλ  / DghDgh
 
             if (2*α_MG > α_SD)
                 α = α_MG
@@ -342,8 +354,8 @@ function run!(method::AdmmMaster)
                 β = β_SD - β_MG/2
             end
 
-            α_cor = DhDλ / sqrt(DhDh * DλDλ)
-            β_cor = DgDλ / sqrt(DgDg * DλDλ)
+            α_cor = DhhDλh / sqrt(DhhDhh * DλhDλh)
+            β_cor = DghDλ  / sqrt(DghDgh * DλDλ  )
 
             push!(method.α_list,α)
             push!(method.β_list,β)
@@ -369,11 +381,8 @@ function run!(method::AdmmMaster)
             method.γ = min(γ_hat, (1+method.C_cg/method.iter^2))
             copy!(method.u_k0, method.u_old)
             copy!(method.v_k0, method.v_old)
-            for i in 1:length(method.coupling_ids)
-                for idx in method.coupling_ids[i]
-                    method.λ_k0[idx] = method.λ_old[i]
-                end
-            end
+            copy!(method.λ_k0, method.λ_old)
+            copy!(method.λhat_k0, λ_hat)
         end
 
         # clock iteration time

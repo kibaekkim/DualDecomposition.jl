@@ -319,11 +319,14 @@ function run!(method::AdmmMaster)
                 end
             end
 
-            Dh_hat = method.u_old - method.u_k0
-            Dg_hat = method.v_old - method.v_k0
+            # Dh_hat = method.u_old - method.u_k0
+            Dh_hat = method.u - method.u_k0
+            # Dg_hat = method.v_old - method.v_k0
+            Dg_hat = method.v - method.v_k0
             Dλ     = zeros(Float64,method.num_vars)
             for i in 1:length(method.coupling_ids)
                 for idx in method.coupling_ids[i]
+                    # Dλ[idx] = method.λ_old[i] - method.λ_k0[i]
                     Dλ[idx] = method.λ[i] - method.λ_k0[i]
                 end
             end
@@ -379,9 +382,13 @@ function run!(method::AdmmMaster)
 
             method.ρ = min(ρ_hat, (1+method.C_cg/method.iter^2)*method.ρ)
             method.γ = min(γ_hat, (1+method.C_cg/method.iter^2))
-            copy!(method.u_k0, method.u_old)
-            copy!(method.v_k0, method.v_old)
-            copy!(method.λ_k0, method.λ_old)
+            # copy!(method.u_k0, method.u_old)
+            # copy!(method.v_k0, method.v_old)
+            # copy!(method.λ_k0, method.λ_old)
+            # copy!(method.λhat_k0, λ_hat)
+            copy!(method.u_k0, method.u)
+            copy!(method.v_k0, method.v)
+            copy!(method.λ_k0, method.λ)
             copy!(method.λhat_k0, λ_hat)
         end
 

@@ -66,6 +66,8 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     residual_primal_list::Vector{Float64}
     residual_dual_list::Vector{Float64}
     penalty_list::Vector{Float64}
+    v_list::Vector{Vector{Float64}}
+    λ_list::Vector{Vector{Float64}}
     τ_list::Vector{Float64}
     γ_list::Vector{Float64}
     α_list::Vector{Float64}
@@ -133,6 +135,8 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.residual_primal_list = []
         am.residual_dual_list = []
         am.penalty_list = []
+        am.v_list = []
+        am.λ_list = []
         am.τ_list = []
         am.γ_list = []
         am.α_list = []
@@ -400,6 +404,8 @@ function run!(method::AdmmMaster)
         push!(method.residual_primal_list, method.pres)
         push!(method.residual_dual_list, method.dres)
         push!(method.penalty_list, method.ρ)
+        push!(method.v_list, method.v)
+        push!(method.λ_list, method.λ)
         if (method.alg == 2)
             push!(method.τ_list, method.τ)
         end
@@ -462,4 +468,15 @@ function write_all(LM::AdmmMaster; dir = ".")
         write_file!(LM.βcor_list, "beta_cor.txt", dir)
         write_file!(LM.γ_list, "relaxation.txt", dir)
     end
+end
+
+function write_dual_bound(LM::AdmmMaster; dir = ".")
+    dual_bound_list::Vector{Float64} = []
+
+    for i in 1:length(LM.penalty_list)
+        f, u_dict, status_dict = LM.eval_f(LM.penalty_list[i], LM.v_list[i], LM.λ_list[i], true)
+        push!(dual_bound_list, -sum(f))
+    end
+
+    write_file!(dual_bound_list, "dual_bound.txt", dir)
 end

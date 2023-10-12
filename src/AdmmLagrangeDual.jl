@@ -224,15 +224,19 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             for (k,v) in objvals_combined
                 objvals_vec[k] = v
             end
-            push!(LD.subobj_value, sum(objvals_vec))
+            if (!eval)
+                push!(LD.subobj_value, sum(objvals_vec))
+            end
         end
 
         us_combined = parallel.combine_dict(us)
         statuses_combined = parallel.combine_dict(statuses)
 
         if parallel.is_root()
-            push!(LD.subcomm_time, time() - comm_time)
-            # @printf("Subproblem sommunication time: %6.1f sec.\n", time() - comm_time)
+            if (!eval)
+                push!(LD.subcomm_time, time() - comm_time)
+                # @printf("Subproblem sommunication time: %6.1f sec.\n", time() - comm_time)
+            end
         end
 
         return objvals_vec, us_combined, statuses_combined

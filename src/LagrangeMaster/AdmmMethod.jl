@@ -470,7 +470,7 @@ function write_all(LM::AdmmMaster; dir = ".")
     end
 end
 
-function write_dual_bound(LD::AbstractLagrangeDual, LM::AdmmMaster; dir = ".")
+function write_dual_bound(LM::AdmmMaster; dir = ".")
     dual_bound_list::Vector{Float64} = []
     if parallel.is_root()
         for i in 1:length(LM.penalty_list)
@@ -483,7 +483,7 @@ function write_dual_bound(LD::AbstractLagrangeDual, LM::AdmmMaster; dir = ".")
         (ρ,v,λ,eval) = parallel.bcast(nothing)
         while length(λ) > 0
              
-            LD.solveAdmmLagrangeDual(ρ, v, λ, eval)
+            LM.eval_f(ρ, v, λ, eval)
             (ρ,v,λ,eval) = parallel.bcast(nothing)
         end
     end

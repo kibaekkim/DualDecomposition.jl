@@ -263,6 +263,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         # broadcast we are done.
         parallel.bcast((nothing, Float64[], Float64[], nothing))
     else
+        LM.eval_f = solveAdmmLagrangeDual
         (ρ,v,λ,eval) = parallel.bcast(nothing)
         while length(λ) > 0
             solveAdmmLagrangeDual(ρ, v, λ, eval)

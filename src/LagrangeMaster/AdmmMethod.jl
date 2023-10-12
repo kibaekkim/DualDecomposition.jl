@@ -471,9 +471,8 @@ function write_all(LM::AdmmMaster; dir = ".")
 end
 
 function write_dual_bound(LM::AdmmMaster; dir = ".")
+    dual_bound_list::Vector{Float64} = []
     if parallel.is_root()
-        dual_bound_list::Vector{Float64} = []
-
         for i in 1:length(LM.penalty_list)
             f, u_dict, status_dict = LM.eval_f(LM.penalty_list[i], LM.v_list[i], LM.λ_list[i], true)
             push!(dual_bound_list, -sum(f))

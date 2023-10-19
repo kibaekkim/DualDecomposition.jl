@@ -116,10 +116,10 @@ function create_scenario_model(s::Int64)
     @variable(model, y[i=sI,j=sJ], Bin)
     @variable(model, y0[j=sJ] >= 0)
 
-    @objective(model, Min,
+    @objective(model, Min, Pr[s]*(
             sum(c[j]*x[j] for j in sJ)
         - sum(q[i,j,s]*y[i,j] for i in sI for j in sJ)
-        + sum(q0[j]*y0[j] for j in sJ))
+        + sum(q0[j]*y0[j] for j in sJ)))
 
     @constraint(model, sum(x[j] for j in sJ) <= v)
     @constraint(model, [j=sJ], sum(d[i,j,s]*y[i,j] for i in sI) - y0[j] <= u*x[j])

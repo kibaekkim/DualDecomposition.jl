@@ -64,10 +64,10 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
       @variable(model, u[i=sR,t=sT], Bin)
       @variable(model, y[i=sR,j=sN,t=sT], Bin)
       @variable(model, z[j=sN,t=sT], Bin)
-      @objective(model, Min,
+      @objective(model, Min, Pr[s]*(
             sum(a[i,t]*x[i,t] + b[i,t]*u[i,t] for i in sR for t in sT)
           + sum(c[i,j,t,s]*y[i,j,t] for i in sR for j in sN for t in sT)
-          + sum(c0[j,t,s]*z[j,t] for j in sN for t in sT))
+          + sum(c0[j,t,s]*z[j,t] for j in sN for t in sT)))
       @constraint(model, [i=sR,t=sT], x[i,t] - u[i,t] <= 0)
       @constraint(model, [i=sR,t=sT], -sum(x[i,tau] for tau in 1:t) + sum(d[j,t,s]*y[i,j,t] for j in sN) <= 0)
       @constraint(model, [j=sN,t=sT], sum(y[i,j,t] for i in sR) + z[j,t] == 1)

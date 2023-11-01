@@ -105,7 +105,7 @@ function create_scenario_model(s::Int64)
     @variable(model, u[i=sR,t=sT], Bin)
     @variable(model, y[i=sR,j=sN,t=sT], Bin)
     @variable(model, z[j=sN,t=sT], Bin)
-    @objective(model, Min, Pr[s]*(
+    @objective(model, Min, (
           sum(a[i,t]*x[i,t] + b[i,t]*u[i,t] for i in sR for t in sT)
         + sum(c[i,j,t,s]*y[i,j,t] for i in sR for j in sN for t in sT)
         + sum(c0[j,t,s]*z[j,t] for j in sN for t in sT)))

@@ -89,19 +89,20 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
       model = models[s]
       xref = model[:x]
       for i in sR, t in sT
-          push!(coupling_variables, DD.CouplingVariableRef(s, (i,t), xref[i,t]))
+          push!(coupling_variables, DD.CouplingVariableRef(s, (1,i,t), xref[i,t]))
       end
       uref = model[:u]
       for i in sR, t in sT
-          push!(coupling_variables, DD.CouplingVariableRef(s, (i,t), uref[i,t]))
+          push!(coupling_variables, DD.CouplingVariableRef(s, (2,i,t), uref[i,t]))
       end
   end
 
   # Set nonanticipativity variables as an array of symbols.
   DD.set_coupling_variables!(algo, coupling_variables)
   
-  # Solve the problem with the solver; this solver is for the underlying bundle method.
-  DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+  LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+
+  DD.run!(algo, LM)
 end
 
 main_dcap(2,3,3,20)

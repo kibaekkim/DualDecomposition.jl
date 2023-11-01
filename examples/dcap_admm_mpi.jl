@@ -153,11 +153,11 @@ for s in parallel.getpartition()
     model = models[s]
     xref = model[:x]
     for i in sR, t in sT
-        push!(coupling_variables, DD.CouplingVariableRef(s, (i,t), xref[i,t]))
+        push!(coupling_variables, DD.CouplingVariableRef(s, (1,i,t), xref[i,t]))
     end
     uref = model[:u]
     for i in sR, t in sT
-        push!(coupling_variables, DD.CouplingVariableRef(s, (i,t), uref[i,t]))
+        push!(coupling_variables, DD.CouplingVariableRef(s, (2,i,t), uref[i,t]))
     end
 end
 

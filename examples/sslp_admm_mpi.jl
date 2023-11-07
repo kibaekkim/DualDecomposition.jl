@@ -73,6 +73,10 @@ function parse_commandline()
             help = "ADMM tolerance level"
             arg_type = Float64
             default = 1e-6
+        "--age"
+            help = "cut age"
+            arg_type = Int
+            default = 10
         "--dir"
             help = "output directory"
             arg_type = String
@@ -89,6 +93,7 @@ nI = parsed_args["nI"]
 nS = parsed_args["nS"]
 rho = parsed_args["rho"]
 tol = parsed_args["tol"]
+age = parsed_args["age"]
 dir = parsed_args["dir"]
 seed::Int = 1
 # function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
@@ -134,6 +139,7 @@ parallel.init()
 # Create DualDecomposition instance.
 params = BM.Parameters()
 BM.set_parameter(params, "print_output", false)
+BM.set_parameter(params, "max_age", age)
 algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
 
 # partition scenarios into processes

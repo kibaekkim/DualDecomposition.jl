@@ -58,9 +58,13 @@ function parse_commandline()
             arg_type = Int
             default = 20
         "--tol"
-            help = "ADMM tolerance level"
+            help = "tolerance level"
             arg_type = Float64
             default = 1e-6
+        "--age"
+            help = "cut age"
+            arg_type = Int
+            default = 10
         "--dir"
             help = "output directory"
             arg_type = String
@@ -76,6 +80,7 @@ nN = parsed_args["nN"]
 nT = parsed_args["nT"]
 nS = parsed_args["nS"]
 tol = parsed_args["tol"]
+age = parsed_args["age"]
 dir = parsed_args["dir"]
 seed::Int = 1
 
@@ -150,6 +155,7 @@ DD.set_coupling_variables!(algo, coupling_variables)
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 params = BM.Parameters()
 BM.set_parameter(params, "ϵ_s", tol)
+BM.set_parameter(params, "max_age", age)
 LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
 
 DD.run!(algo, LM)

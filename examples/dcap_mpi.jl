@@ -65,6 +65,10 @@ function parse_commandline()
             help = "cut age"
             arg_type = Int
             default = 10
+        "--proxu"
+            help = "initial proximal penalty value"
+            arg_type = Float64
+            default = 1.e-2
         "--dir"
             help = "output directory"
             arg_type = String
@@ -81,6 +85,7 @@ nT = parsed_args["nT"]
 nS = parsed_args["nS"]
 tol = parsed_args["tol"]
 age = parsed_args["age"]
+proxu = parsed_args["proxu"]
 dir = parsed_args["dir"]
 seed::Int = 1
 
@@ -156,6 +161,7 @@ DD.set_coupling_variables!(algo, coupling_variables)
 params = BM.Parameters()
 BM.set_parameter(params, "ϵ_s", tol)
 BM.set_parameter(params, "max_age", age)
+BM.set_parameter(params, "u", proxu)
 LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
 
 DD.run!(algo, LM)

@@ -69,6 +69,10 @@ function parse_commandline()
             help = "initial proximal penalty value"
             arg_type = Float64
             default = 1.e-2
+        "--numcut"
+            help = "number of cuts"
+            arg_type = Int
+            default = 1
         "--dir"
             help = "output directory"
             arg_type = String
@@ -86,6 +90,7 @@ nS = parsed_args["nS"]
 tol = parsed_args["tol"]
 age = parsed_args["age"]
 proxu = parsed_args["proxu"]
+numcut = parsed_args["numcut"]
 dir = parsed_args["dir"]
 seed::Int = 1
 
@@ -162,6 +167,7 @@ params = BM.Parameters()
 BM.set_parameter(params, "ϵ_s", tol)
 BM.set_parameter(params, "max_age", age)
 BM.set_parameter(params, "u", proxu)
+BM.set_parameter(params, "ncuts_per_iter", numcut)
 LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
 
 DD.run!(algo, LM)

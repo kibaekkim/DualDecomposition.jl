@@ -43,6 +43,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
     τ::Float64
     ξ::Float64
     μ::Float64
+    update_interval::Int
     #2: adaptive residual balancing
     τmax::Float64
     #3: relaxed ADMM
@@ -77,7 +78,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
 
     wallclock_time::Vector{Float64}
 
-    function AdmmMaster(;alg=1, ρ=1.0, ϵ=1e-6, maxiter=1000, maxtime=3600.0)
+    function AdmmMaster(;alg=1, ρ=1.0, ϵ=1e-6, maxiter=1000, maxtime=3600.0, update_interval = 1)
         am = new()
         am.alg = alg
         am.num_vars = 0
@@ -112,6 +113,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.τ = 2.0
         am.ξ = 10.0
         am.μ = 1.0
+        am.update_interval = update_interval
         #2: adaptive residual balancing
         am.τmax = 10.0
         #3: relaxed ADMM
@@ -297,20 +299,22 @@ function run!(method::AdmmMaster)
         #1: residual balancing
         #2: adaptive residual balancing
         if (method.alg == 1 || method.alg == 2)
-            if (method.alg == 2)
-                pres_raw = sqrt(sum(abs2, method.u - method.v))
-                dres_raw = method.ρ*sqrt(sum(abs2, method.v - method.v_old))
-                newτ = sqrt(pres_raw/dres_raw/method.ξ)
-                if (newτ >= 1 && newτ < method.τmax)
-                    method.τ = newτ
-                elseif (newτ < 1 && newτ >= 1/method.τmax)
-                    method.τ = 1/newτ
+            if (method.iter % method.update_interval == 0)
+                if (method.alg == 2)
+                    pres_raw = sqrt(sum(abs2, method.u - method.v))
+                    dres_raw = method.ρ*sqrt(sum(abs2, method.v - method.v_old))
+                    newτ = sqrt(pres_raw/dres_raw/method.ξ)
+                    if (newτ >= 1 && newτ < method.τmax)
+                        method.τ = newτ
+                    elseif (newτ < 1 && newτ >= 1/method.τmax)
+                        method.τ = 1/newτ
+                    end
                 end
-            end
-            if (method.pres > method.ξ*method.μ*method.dres)
-                method.ρ *= method.τ
-            elseif (method.dres > method.μ/method.ξ*method.pres)
-                method.ρ /= method.τ
+                if (method.pres > method.ξ*method.μ*method.dres)
+                    method.ρ *= method.τ
+                elseif (method.dres > method.μ/method.ξ*method.pres)
+                    method.ρ /= method.τ
+                end
             end
         end
         #update ρ and γ

@@ -73,6 +73,10 @@ function parse_commandline()
             help = "ADMM tolerance level"
             arg_type = Float64
             default = 1e-6
+        "--interval"
+            help = "ADMM update interval"
+            arg_type = Int
+            default = 1
         "--age"
             help = "cut age"
             arg_type = Int
@@ -93,6 +97,7 @@ nI = parsed_args["nI"]
 nS = parsed_args["nS"]
 rho = parsed_args["rho"]
 tol = parsed_args["tol"]
+uinterval = parsed_args["interval"]
 age = parsed_args["age"]
 dir = parsed_args["dir"]
 seed::Int = 1
@@ -164,7 +169,7 @@ end
 DD.set_coupling_variables!(algo, coupling_variables)
 
 # Lagrange master method
-LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000)
+LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, update_interval = uinterval)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)

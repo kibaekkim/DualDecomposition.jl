@@ -78,7 +78,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
 
     wallclock_time::Vector{Float64}
 
-    function AdmmMaster(;alg=1, ρ=1.0, ϵ=1e-6, maxiter=1000, maxtime=3600.0, update_interval = 1)
+    function AdmmMaster(;alg=1, ρ=1.0, ϵ=1e-6, maxiter=1000, maxtime=3600.0, update_interval = 1,τ = 2.0)
         am = new()
         am.alg = alg
         am.num_vars = 0
@@ -110,7 +110,7 @@ mutable struct AdmmMaster <: AbstractLagrangeMaster
         am.valid_step_prev = false
         
         #1: residual balancing
-        am.τ = 2.0
+        am.τ = τ
         am.ξ = 10.0
         am.μ = 1.0
         am.update_interval = update_interval

@@ -74,6 +74,10 @@ function parse_commandline()
             help = "ADMM tolerance level"
             arg_type = Float64
             default = 1e-6
+        "--tau"
+            help = "Residual balancing multiplier"
+            arg_type = Float64
+            default = 2.0
         "--interval"
             help = "ADMM update interval"
             arg_type = Int
@@ -99,6 +103,7 @@ nT = parsed_args["nT"]
 nS = parsed_args["nS"]
 rho = parsed_args["rho"]
 tol = parsed_args["tol"]
+tau = parsed_args["tau"]
 uinterval = parsed_args["interval"]
 age = parsed_args["age"]
 dir = parsed_args["dir"]
@@ -176,7 +181,7 @@ end
 DD.set_coupling_variables!(algo, coupling_variables)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
-LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, update_interval = uinterval)
+LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=1000, update_interval = uinterval, τ=tau)
 
 DD.run!(algo, LM)
 

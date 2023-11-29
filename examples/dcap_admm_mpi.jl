@@ -181,7 +181,7 @@ end
 DD.set_coupling_variables!(algo, coupling_variables)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
-LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=1000, update_interval = uinterval, τ=tau)
+LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, update_interval = uinterval, τ=tau)
 
 DD.run!(algo, LM)
 

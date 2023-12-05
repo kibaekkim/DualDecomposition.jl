@@ -215,7 +215,7 @@ algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optim
 
 
 # partition scenarios into processes
-parallel.partition(nS)
+parallel.partition(NS)
 
 coupling_variables = Vector{DD.CouplingVariableRef}()
 models = Dict{Int,JuMP.Model}()

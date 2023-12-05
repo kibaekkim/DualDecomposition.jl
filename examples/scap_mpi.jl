@@ -196,7 +196,7 @@ parallel.init()
 algo = DD.LagrangeDual()
 
 # partition scenarios into processes
-parallel.partition(nS)
+parallel.partition(NS)
 
 coupling_variables = Vector{DD.CouplingVariableRef}()
 models = Dict{Int,JuMP.Model}()

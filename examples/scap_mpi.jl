@@ -84,9 +84,9 @@ seed::Int = 1
 
 function create_root(nI::Int, nT::Int, nS::Int)::DD.Tree
     ξ = Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(
-        :α => ones(nI),
-        :β => ones(nI)*10, 
-        :d => 5.0)
+        :α => ones(nI)*10,
+        :β => ones(nI)*100, 
+        :d => 50.0)
 
     tree = DD.Tree(ξ)
 
@@ -174,11 +174,11 @@ function create_params(tree::DD.Tree, nI::Int, pt::Int)
     #d: μ = 1, σ = 1
     normal = Normal()
     α = DD.get_scenario(tree, pt)[:α]
-    α_ = [ α[i] * exp((-(0.25*i)^2/2) + 0.25*i*rand(normal)) for i in 1:nI]
+    α_ = [ ceil(α[i] * exp((-(0.25*i)^2/2) + 0.25*i*rand(normal))) for i in 1:nI]
     β = DD.get_scenario(tree, pt)[:β]
-    β_ = [ β[i] * exp((-1-(0.25*i)^2/2) + 0.25*i*rand(normal)) for i in 1:nI]
+    β_ = [ ceil(β[i] * exp((-1-(0.25*i)^2/2) + 0.25*i*rand(normal))) for i in 1:nI]
     d = DD.get_scenario(tree, pt)[:d]
-    d_ = d * exp((1-1/2) + rand(normal)) 
+    d_ = ceil(d * exp((1-1/2) + rand(normal)))
     return α_, β_, d_
 end
 

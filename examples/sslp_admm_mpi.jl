@@ -44,6 +44,12 @@ const parallel = DD.parallel
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
+        "--subsolver"
+            help = "solver for subproblem:\n
+                    -glpk
+                    -cplex"
+            arg_type = String
+            default = "glpk"
         "--alg"
             help = "algorithm mode:\n
                     -0: constant ρ\n
@@ -95,6 +101,10 @@ end
 
 parsed_args = parse_commandline()
 
+subsolver = parsed_args["subsolver"]
+if subsolver == "cplex"
+    using CPLEX
+end
 alg = parsed_args["alg"]
 nJ = parsed_args["nJ"]
 nI = parsed_args["nI"]
@@ -125,7 +135,11 @@ Pr = ones(nS)/nS
 
 # This creates a Lagrange dual problem for each scenario s.
 function create_scenario_model(s::Int64)
-    model = Model(GLPK.Optimizer)
+    if subsolver == "cplex"
+        model = Model(CPLEX.Optimizer)
+    else
+        model = Model(GLPK.Optimizer)
+    end
 
     @variable(model, x[j=sJ], Bin)
     @variable(model, y[i=sI,j=sJ], Bin)

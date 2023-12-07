@@ -34,6 +34,12 @@ const parallel = DD.parallel
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
+        "--subsolver"
+            help = "solver for subproblem:\n
+                    -glpk
+                    -cplex"
+            arg_type = String
+            default = "glpk"
         "--alg"
             help = "algorithm mode:\n
                     -0: constant ρ\n
@@ -85,6 +91,10 @@ end
 
 parsed_args = parse_commandline()
 
+subsolver = parsed_args["subsolver"]
+if subsolver == "cplex"
+    using CPLEX
+end
 alg = parsed_args["alg"]
 nI = parsed_args["nI"]
 nT = parsed_args["nT"]
@@ -223,7 +233,11 @@ models = Dict{Int,JuMP.Model}()
 for block_id in parallel.getpartition()
     nodes = node_cluster[block_id]
     subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
-    set_optimizer(subtree.model, GLPK.Optimizer)
+    if subsolver == "cplex"
+        set_optimizer(subtree.model, CPLEX.Optimizer)
+    else
+        set_optimizer(subtree.model, GLPK.Optimizer)
+    end
     DD.add_block_model!(algo, block_id, subtree.model)
     models[block_id] = subtree.model
 end

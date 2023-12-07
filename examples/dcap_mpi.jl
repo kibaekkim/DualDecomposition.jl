@@ -41,6 +41,12 @@ const parallel = DD.parallel
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
+        "--subsolver"
+            help = "solver for subproblem:\n
+                    -glpk
+                    -cplex"
+            arg_type = String
+            default = "glpk"
         "--nR"
             help = "number of resources"
             arg_type = Int
@@ -83,6 +89,10 @@ end
 
 parsed_args = parse_commandline()
 
+subsolver = parsed_args["subsolver"]
+if subsolver == "cplex"
+  using CPLEX
+end
 nR = parsed_args["nR"]
 nN = parsed_args["nN"]
 nT = parsed_args["nT"]
@@ -113,7 +123,11 @@ Pr = ones(nS)/nS
 function create_scenario_model(s::Int64)
 
     # construct JuMP.Model
-    model = Model(GLPK.Optimizer)
+    if subsolver == "cplex"
+      model = Model(CPLEX.Optimizer)
+    else
+      model = Model(GLPK.Optimizer)
+    end
 
     ## 1st stage
     @variable(model, x[i=sR,t=sT] >= 0)

@@ -49,6 +49,12 @@ deterministic model:
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
+        "--subsolver"
+            help = "solver for subproblem:\n
+                    -glpk
+                    -cplex"
+            arg_type = String
+            default = "glpk"
         "--nK"
             help = "number of stages"
             arg_type = Int
@@ -83,6 +89,10 @@ end
 
 parsed_args = parse_commandline()
 
+subsolver = parsed_args["subsolver"]
+if subsolver == "cplex"
+    using CPLEX
+end
 nK = parsed_args["nK"]
 nL = parsed_args["nL"]
 tol = parsed_args["tol"]
@@ -227,7 +237,11 @@ models = Dict{Int,JuMP.Model}()
 for block_id in parallel.getpartition()
     nodes = node_cluster[block_id]
     subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
-    set_optimizer(subtree.model, GLPK.Optimizer)
+    if subsolver == "cplex"
+        set_optimizer(subtree.model, CPLEX.Optimizer)
+    else
+        set_optimizer(subtree.model, GLPK.Optimizer)
+    end
     DD.add_block_model!(algo, block_id, subtree.model)
     models[block_id] = subtree.model
 end

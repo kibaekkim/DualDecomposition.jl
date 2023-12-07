@@ -257,6 +257,7 @@ for block_id in parallel.getpartition()
     subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
     if subsolver == "cplex"
         set_optimizer(subtree.model, CPLEX.Optimizer)
+        set_optimizer_attribute(subtree.model, "CPXPARAM_MIP_Display", 0)
     else
         set_optimizer(subtree.model, GLPK.Optimizer)
     end

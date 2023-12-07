@@ -125,6 +125,7 @@ function create_scenario_model(s::Int64)
     # construct JuMP.Model
     if subsolver == "cplex"
       model = Model(CPLEX.Optimizer)
+      set_optimizer_attribute(model, "CPXPARAM_MIP_Display", 0)
     else
       model = Model(GLPK.Optimizer)
     end

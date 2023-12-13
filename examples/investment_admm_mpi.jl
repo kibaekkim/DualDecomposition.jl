@@ -259,6 +259,7 @@ for block_id in parallel.getpartition()
         set_optimizer(subtree.model, CPLEX.Optimizer)
         set_optimizer_attribute(subtree.model, "CPXPARAM_ScreenOutput", 0)
         set_optimizer_attribute(subtree.model, "CPXPARAM_MIP_Display", 0)
+        set_optimizer_attribute(subtree.model, "CPX_PARAM_THREADS", 1)
     else
         set_optimizer(subtree.model, GLPK.Optimizer)
     end

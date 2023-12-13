@@ -139,6 +139,7 @@ function create_scenario_model(s::Int64)
         model = Model(CPLEX.Optimizer)
         set_optimizer_attribute(model, "CPXPARAM_ScreenOutput", 0)
         set_optimizer_attribute(model, "CPXPARAM_MIP_Display", 0)
+        set_optimizer_attribute(model, "CPX_PARAM_THREADS", 1)
     else
         model = Model(GLPK.Optimizer)
     end

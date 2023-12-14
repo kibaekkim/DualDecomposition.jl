@@ -73,6 +73,14 @@ function parse_commandline()
             help = "Residual balancing multiplier"
             arg_type = Float64
             default = 2.0
+        "--mu"
+            help = "Residual balancing parameter"
+            arg_type = Float64
+            default = 1.0
+        "--xi"
+            help = "Residual balancing parameter"
+            arg_type = Float64
+            default = 10.0
         "--interval"
             help = "ADMM update interval"
             arg_type = Int
@@ -102,6 +110,8 @@ nS = parsed_args["nS"]
 rho = parsed_args["rho"]
 tol = parsed_args["tol"]
 tau = parsed_args["tau"]
+mu = parsed_args["mu"]
+xi = parsed_args["xi"]
 uinterval = parsed_args["interval"]
 age = parsed_args["age"]
 dir = parsed_args["dir"]
@@ -249,7 +259,7 @@ end
 DD.set_coupling_variables!(algo, coupling_variables)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
-LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, update_interval = uinterval, τ=tau)
+LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, update_interval = uinterval, τ=tau, μ=mu, ξ=xi)
 
 DD.run!(algo, LM)
   

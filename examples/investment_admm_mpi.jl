@@ -286,7 +286,7 @@ end
 DD.set_coupling_variables!(algo, coupling_variables)
 
 # Lagrange master method
-LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, max_time=timelim, update_interval = uinterval, τ=tau, μ=mu, ξ=xi)
+LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, maxtime=timelim, update_interval = uinterval, τ=tau, μ=mu, ξ=xi)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 DD.run!(algo, LM)

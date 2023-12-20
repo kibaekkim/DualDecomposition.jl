@@ -47,6 +47,10 @@ function parse_commandline()
                     -cplex"
             arg_type = String
             default = "glpk"
+        "--timelim"
+            help = "time limit"
+            arg_type = Float64
+            default = 3600.0
         "--nR"
             help = "number of resources"
             arg_type = Int
@@ -93,6 +97,7 @@ subsolver = parsed_args["subsolver"]
 if subsolver == "cplex"
   using CPLEX
 end
+timelim = parsed_args["timelim"]
 nR = parsed_args["nR"]
 nN = parsed_args["nN"]
 nT = parsed_args["nT"]
@@ -181,6 +186,7 @@ DD.set_coupling_variables!(algo, coupling_variables)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
 params = BM.Parameters()
+BM.set_parameter(params, "time_limit", timelim)
 BM.set_parameter(params, "ϵ_s", tol)
 BM.set_parameter(params, "max_age", age)
 BM.set_parameter(params, "u", proxu)

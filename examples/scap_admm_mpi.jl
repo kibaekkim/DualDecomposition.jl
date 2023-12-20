@@ -40,6 +40,10 @@ function parse_commandline()
                     -cplex"
             arg_type = String
             default = "glpk"
+        "--timelim"
+            help = "time limit"
+            arg_type = Float64
+            default = 3600.0
         "--alg"
             help = "algorithm mode:\n
                     -0: constant ρ\n
@@ -103,6 +107,7 @@ subsolver = parsed_args["subsolver"]
 if subsolver == "cplex"
     using CPLEX
 end
+timelim = parsed_args["timelim"]
 alg = parsed_args["alg"]
 nI = parsed_args["nI"]
 nT = parsed_args["nT"]
@@ -259,7 +264,7 @@ end
 DD.set_coupling_variables!(algo, coupling_variables)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
-LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, update_interval = uinterval, τ=tau, μ=mu, ξ=xi)
+LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, max_time=timelim, update_interval = uinterval, τ=tau, μ=mu, ξ=xi)
 
 DD.run!(algo, LM)
   

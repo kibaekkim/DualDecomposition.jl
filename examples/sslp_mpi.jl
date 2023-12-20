@@ -50,6 +50,10 @@ function parse_commandline()
                     -cplex"
             arg_type = String
             default = "glpk"
+        "--timelim"
+            help = "time limit"
+            arg_type = Float64
+            default = 3600.0
         "--nJ"
             help = "number of servers"
             arg_type = Int
@@ -92,6 +96,7 @@ subsolver = parsed_args["subsolver"]
 if subsolver == "cplex"
     using CPLEX
 end
+timelim = parsed_args["timelim"]
 nJ = parsed_args["nJ"]
 nI = parsed_args["nI"]
 nS = parsed_args["nS"]
@@ -174,6 +179,7 @@ DD.set_coupling_variables!(algo, coupling_variables)
 
 # Lagrange master method
 params = BM.Parameters()
+BM.set_parameter(params, "time_limit", timelim)
 BM.set_parameter(params, "ϵ_s", tol)
 BM.set_parameter(params, "max_age", age)
 BM.set_parameter(params, "u", proxu)

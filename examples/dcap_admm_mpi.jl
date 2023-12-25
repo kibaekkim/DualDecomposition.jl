@@ -192,7 +192,11 @@ parallel.init()
 params = BM.Parameters()
 BM.set_parameter(params, "print_output", false)
 BM.set_parameter(params, "max_age", age)
-algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
+if mastersolver == "cplex"
+  algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(CPLEX.Optimizer, "print_level" => 0), params)
+else
+  algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
+
 
 # partition scenarios into processes
 parallel.partition(nS)

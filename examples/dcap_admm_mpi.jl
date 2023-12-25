@@ -196,6 +196,7 @@ if mastersolver == "cplex"
   algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(CPLEX.Optimizer, "print_level" => 0), params)
 else
   algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
+end
 
 
 # partition scenarios into processes

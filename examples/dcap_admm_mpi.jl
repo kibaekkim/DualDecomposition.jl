@@ -193,7 +193,7 @@ params = BM.Parameters()
 BM.set_parameter(params, "print_output", false)
 BM.set_parameter(params, "max_age", age)
 if mastersolver == "cplex"
-  algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(CPLEX.Optimizer, "print_level" => 0), params)
+  algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(CPLEX.Optimizer, "CPXPARAM_ScreenOutput" => 0, "CPXPARAM_MIP_Display" => 0, "CPX_PARAM_THREADS" => 1), params)
 else
   algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
 end

@@ -41,6 +41,12 @@ const parallel = DD.parallel
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
+        "--mastersolver"
+          help = "solver for master problem:\n
+                  -Ipopt
+                  -cplex"
+          arg_type = String
+          default = "Ipopt"
         "--subsolver"
           help = "solver for subproblem:\n
                   -glpk
@@ -114,8 +120,9 @@ end
 
 parsed_args = parse_commandline()
 
+mastersolver = parsed_args["mastersolver"]
 subsolver = parsed_args["subsolver"]
-if subsolver == "cplex"
+if mastersolver == "cplex" || subsolver == "cplex" 
   using CPLEX
 end
 timelim = parsed_args["timelim"]

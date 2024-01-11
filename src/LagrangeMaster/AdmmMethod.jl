@@ -273,7 +273,7 @@ function run!(method::AdmmMaster)
         for (id, status) in status_dict
             if status != 1 # (1=optimal)
                 method.valid_step = false
-                break
+                println("Warning! id $id has status $status.")
             end
         end
 

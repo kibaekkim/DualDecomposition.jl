@@ -34,6 +34,13 @@ const parallel = DD.parallel
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
+        "--master"
+            help = "master algorithm:\n
+                    -bm: bundle master
+                    -am: admm master
+                    "        
+            arg_type = String
+            default = "bm"
         "--subsolver"
             help = "solver for subproblem:\n
                     -glpk
@@ -44,6 +51,56 @@ function parse_commandline()
             help = "time limit"
             arg_type = Float64
             default = 3600.0
+        "--tol"
+            help = "tolerance level"
+            arg_type = Float64
+            default = 1e-6
+        "--age"
+            help = "cut age"
+            arg_type = Int
+            default = 10
+        "--bmalg"
+            help = "Bundle Method algorithm mode:\n
+                    -0: proximal method"
+            arg_type = Int
+            default = 0
+        "--proxu"
+            help = "initial proximal penalty value"
+            arg_type = Float64
+            default = 1.e-2
+        "--numcut"
+            help = "number of cuts"
+            arg_type = Int
+            default = 1
+        "--amalg"
+            help = "ADMM algorithm mode:\n
+                    -0: constant ρ\n
+                    -1: residual balancing\n
+                    -2: adaptive residual balancing\n
+                    -3: relaxed ADMM\n
+                    -4: adaptive relaxed ADMM"
+            arg_type = Int
+            default = 1
+        "--rho"
+            help = "ADMM initial penalty value"
+            arg_type = Float64
+            default = 1.0
+        "--tau"
+            help = "ADMM Residual balancing multiplier"
+            arg_type = Float64
+            default = 2.0
+        "--mu"
+            help = "ADMM Residual balancing parameter"
+            arg_type = Float64
+            default = 1.0
+        "--xi"
+            help = "ADMM Residual balancing parameter"
+            arg_type = Float64
+            default = 10.0
+        "--interval"
+            help = "ADMM update interval"
+            arg_type = Int
+            default = 1
         "--nI"
             help = "number of resources"
             arg_type = Int
@@ -56,22 +113,6 @@ function parse_commandline()
             help = "number of scenarios"
             arg_type = Int
             default = 2
-        "--tol"
-            help = "tolerance level"
-            arg_type = Float64
-            default = 1e-6
-        "--age"
-            help = "cut age"
-            arg_type = Int
-            default = 10
-        "--proxu"
-            help = "initial proximal penalty value"
-            arg_type = Float64
-            default = 1.e-2
-        "--numcut"
-            help = "number of cuts"
-            arg_type = Int
-            default = 1
         "--dir"
             help = "output directory"
             arg_type = String
@@ -82,18 +123,31 @@ end
 
 parsed_args = parse_commandline()
 
+masteralg = parsed_args["master"]
 subsolver = parsed_args["subsolver"]
 if subsolver == "cplex"
     using CPLEX
 end
 timelim = parsed_args["timelim"]
+tol = parsed_args["tol"]
+age = parsed_args["age"]
+
+if masteralg == "bm"
+    bmalg = parsed_args["bmalg"]
+    proxu = parsed_args["proxu"]
+    numcut = parsed_args["numcut"]
+elseif masteralg == "am"
+    amalg = parsed_args["alg"]
+    rho = parsed_args["rho"]
+    tau = parsed_args["tau"]
+    mu = parsed_args["mu"]
+    xi = parsed_args["xi"]
+    uinterval = parsed_args["interval"]
+end
+
 nI = parsed_args["nI"]
 nT = parsed_args["nT"]
 nS = parsed_args["nS"]
-tol = parsed_args["tol"]
-age = parsed_args["age"]
-proxu = parsed_args["proxu"]
-numcut = parsed_args["numcut"]
 dir = parsed_args["dir"]
 seed::Int = 1
 
@@ -208,7 +262,13 @@ NS = length(node_cluster)
 parallel.init()
 
 # Create DualDecomposition instance.
-algo = DD.LagrangeDual()
+if masteralg == "bm"
+    algo = DD.LagrangeDual()
+elseif masteralg == "am"
+    BM.set_parameter(params, "print_output", false)
+    BM.set_parameter(params, "max_age", age)
+    algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
+end
 
 # partition scenarios into processes
 parallel.partition(NS)
@@ -234,19 +294,26 @@ end
 # Set nonanticipativity variables as an array of symbols.
 DD.set_coupling_variables!(algo, coupling_variables)
 
-# Solve the problem with the solver; this solver is for the underlying bundle method.
-params = BM.Parameters()
-BM.set_parameter(params, "time_limit", timelim)
-BM.set_parameter(params, "ϵ_s", tol)
-BM.set_parameter(params, "max_age", age)
-BM.set_parameter(params, "u", proxu)
-BM.set_parameter(params, "ncuts_per_iter", numcut)
-LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
+# Lagrange master method
+if masteralg == "bm"
+    params = BM.Parameters()
+    BM.set_parameter(params, "time_limit", timelim)
+    BM.set_parameter(params, "ϵ_s", tol)
+    BM.set_parameter(params, "max_age", age)
+    BM.set_parameter(params, "u", proxu)
+    BM.set_parameter(params, "ncuts_per_iter", numcut)
+    LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
+elseif masteralg == "am"
+    LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, maxtime=timelim, update_interval = uinterval, τ=tau, μ=mu, ξ=xi)
+end
 
 DD.run!(algo, LM)
   
 mkpath(dir)
 DD.write_all(algo, dir=dir)
+if masteralg == "am"
+    DD.write_all(LM, dir=dir)
+end
 
 if (parallel.is_root())
   @show DD.primal_objective_value(algo)

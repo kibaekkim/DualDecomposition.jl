@@ -38,7 +38,7 @@
                 model = models[s]
                 xref = model[:x]
                 for i in CROPS
-                    push!(coupling_variables, DD.CouplingVariableRef(s, i, xref[i]))
+                    push!(coupling_variables, DD.CouplingVariableRef(s, "x$i", xref[i]))
                 end
             end
 

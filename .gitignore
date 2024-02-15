@@ -4,3 +4,4 @@ test/*.txt
 examples/*.txt
 Manifest.toml
 build/*
+.vscode/

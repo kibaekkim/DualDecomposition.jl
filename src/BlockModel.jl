@@ -35,6 +35,7 @@ abstract type AbstractBlockModel end
 
 mutable struct BlockModel <: AbstractBlockModel
     model::Dict{Int,JuMP.Model} # Dictionary of block models
+    block_solutions::Dict{Int,Dict{Any,Float64}} #block_id : VariableRef : value
     coupling_variables::Vector{CouplingVariableRef} # array of variables that couple block models
     variables_by_couple::Dict{Any,Vector{CouplingVariableKey}} # maps `couple_id` to `CouplingVariableKey`
 
@@ -49,6 +50,7 @@ mutable struct BlockModel <: AbstractBlockModel
 
     function BlockModel()
         return new(
+            Dict(), 
             Dict(), 
             [],
             Dict(),
@@ -68,6 +70,7 @@ Add block model `model` to `block_model::AbstractBlockModel` with `block_id`.
 """
 function add_block_model!(block_model::AbstractBlockModel, block_id::Integer, model::JuMP.Model)
     block_model.model[block_id] = model
+    block_model.block_solutions[block_id] = Dict()
 end
 
 """
@@ -90,6 +93,13 @@ block_model(block_model::AbstractBlockModel) = block_model.model
 This returns a `JuMP.Model` object for a given `block_id`.
 """
 block_model(block_model::AbstractBlockModel, block_id::Integer) = block_model.model[block_id]
+
+"""
+    block_solutions
+
+This returns a dictionary of `JuMP.VariableRef` solutions.
+"""
+block_solutions(block_model::AbstractBlockModel, block_id::Integer) = block_model.block_solutions[block_id]
 
 """
     has_block_model

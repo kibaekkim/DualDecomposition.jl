@@ -148,7 +148,7 @@ if masteralg == "bm"
     proxu = parsed_args["proxu"]
     numcut = parsed_args["numcut"]
 elseif masteralg == "am"
-    amalg = parsed_args["alg"]
+    amalg = parsed_args["amalg"]
     rho = parsed_args["rho"]
     tau = parsed_args["tau"]
     mu = parsed_args["mu"]
@@ -213,6 +213,7 @@ parallel.init()
 if masteralg == "bm"
     algo = DD.LagrangeDual()
 elseif masteralg == "am"
+    params = BM.Parameters()
     BM.set_parameter(params, "print_output", false)
     BM.set_parameter(params, "max_age", age)
     algo = DD.AdmmLagrangeDual(BM.BasicMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
@@ -253,7 +254,7 @@ if masteralg == "bm"
     BM.set_parameter(params, "ncuts_per_iter", numcut)
     LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0), params)
 elseif masteralg == "am"
-    LM = DD.AdmmMaster(alg=alg, ρ=rho, ϵ=tol, maxiter=100000, maxtime=timelim, update_interval = uinterval, τ=tau, μ=mu, ξ=xi)
+    LM = DD.AdmmMaster(alg=amalg, ρ=rho, ϵ=tol, maxiter=100000, maxtime=timelim, update_interval = uinterval, τ=tau, μ=mu, ξ=xi)
 end
 
 DD.run!(algo, LM)

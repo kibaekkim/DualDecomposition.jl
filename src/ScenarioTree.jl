@@ -277,7 +277,7 @@ function connect_variables!(tree::Tree, block_id::Int, coupling_variables::Vecto
         end
     end
     # connect public in-coming variables
-    for ((label, symb), var1) in node.pub_in
+    for ((label, symb), var1) in subnode.pub_in
         if haskey(subtree.nodes, label)
             source = tree.nodes[label]
             var2 = source.pub_out[label, symb]

@@ -251,8 +251,8 @@ function connect_variables!(tree::Tree, block_id::Int, coupling_variables::Vecto
     # couple out-going variables if not all child node exist
     if length(cid) > 0
         all_children_in_subtree = true
-        for c in cid
-            if !haskey(subtree.nodes, c[0])
+        for (c,r) in cid
+            if !haskey(subtree.nodes, c)
                 all_children_in_subtree = false
                 break
             end

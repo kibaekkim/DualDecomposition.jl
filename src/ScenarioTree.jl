@@ -145,6 +145,8 @@ mutable struct SubTreeNode <: AbstractTreeNode
     weight::Float64
     in::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}    # incoming variables
     out::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # outgoing variables
+    pub_in::Dict{Tuple{Int, Symbol}, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}    # incoming variables (public)
+    pub_out::Dict{Tuple{Int, Symbol}, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # outgoing variables (public)
     obj::Union{Float64, JuMP.AbstractJuMPScalar}
     function SubTreeNode(treenode::TreeNode, weight::Float64)
         stn = new()
@@ -152,6 +154,8 @@ mutable struct SubTreeNode <: AbstractTreeNode
         stn.weight = weight
         stn.in = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
         stn.out = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
+        stn.pub_in = Dict{Tuple{Int, Symbol}, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
+        stn.pub_out = Dict{Tuple{Int, Symbol}, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
         stn.obj = 0.0
         return stn
     end
@@ -170,6 +174,14 @@ end
 
 function set_output_variable!(nd::SubTreeNode, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
     nd.out[symb] = var
+end
+
+function set_public_input_variable!(nd::SubTreeNode, label::Int, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
+    nd.pub_in[label, symb] = var
+end
+
+function set_public_output_variable!(nd::SubTreeNode, label::Int, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
+    nd.pub_out[label, symb] = var
 end
 
 function set_stage_objective(nd::SubTreeNode, obj::Union{Float64, JuMP.AbstractJuMPScalar})
@@ -281,6 +293,9 @@ function couple_common_variables!(coupling_variables::Vector{CouplingVariableRef
     for (symb, var) in node.out
         couple_variables!(coupling_variables, block_id, label, symb, var)
     end
+    for ((label_, symb), var) in node.pub_out
+        couple_variables!(coupling_variables, block_id, label_, symb, var)
+    end
 end
 
 """
@@ -298,6 +313,9 @@ function couple_incoming_variables!(coupling_variables::Vector{CouplingVariableR
     label = get_parent(child)
     for (symb, var) in child.in
         couple_variables!(coupling_variables, block_id, label, symb, var)
+    end
+    for ((label_, symb), var) in node.pub_in
+        couple_variables!(coupling_variables, block_id, label_, symb, var)
     end
 end
 

@@ -275,6 +275,11 @@ function add_links!(tree::SubTree, id::Int, pt::Int)
         var2 = parent.out[symb]
         @constraint(tree.model, var1 .== var2)
     end
+    for ((label, symb), var1) in node.pub_in
+        source = tree.nodes[label]
+        var2 = source.pub_out[label, symb]
+        @constraint(tree.model, var1 .== var2)
+    end
 end
 
 """

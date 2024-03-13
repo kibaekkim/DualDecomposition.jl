@@ -319,7 +319,7 @@ function couple_incoming_variables!(coupling_variables::Vector{CouplingVariableR
     for (symb, var) in child.in
         couple_variables!(coupling_variables, block_id, label, symb, var)
     end
-    for ((label_, symb), var) in node.pub_in
+    for ((label_, symb), var) in child.pub_in
         couple_variables!(coupling_variables, block_id, label_, symb, var)
     end
 end

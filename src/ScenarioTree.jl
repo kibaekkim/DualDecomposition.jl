@@ -266,12 +266,12 @@ function connect_variables!(tree::Tree, block_id::Int, coupling_variables::Vecto
         couple_variables!(coupling_variables, block_id, label_, symb, var)
     end
     # connect in-coming variables
-    if parent!=0
+    if pid!=0
         if haskey(subtree.nodes, pid)
             add_links!(subtree, id, pid)
         else
             # set current node as root of subtree
-            subtree.parent = parent
+            subtree.parent = pid
             subtree.root = id
             couple_incoming_variables!(coupling_variables, block_id, subnode)
         end

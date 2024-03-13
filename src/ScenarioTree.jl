@@ -281,7 +281,7 @@ function connect_variables!(tree::Tree, block_id::Int, coupling_variables::Vecto
         if haskey(subtree.nodes, label)
             source = subtree.nodes[label]
             var2 = source.pub_out[label, symb]
-            @constraint(tree.model, var1 .== var2)
+            @constraint(subtree.model, var1 .== var2)
         else
             couple_variables!(coupling_variables, block_id, label, symb, var1)
         end

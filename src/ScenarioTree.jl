@@ -240,17 +240,52 @@ function create_subtree!(tree::Tree, block_id::Int, coupling_variables::Vector{C
 
     # 
     for (id, subnode) in subtree.nodes
-        couple_common_variables!(coupling_variables, block_id, subnode)
-        parent = get_parent(subnode)
-        if parent!=0 && haskey(subtree.nodes, parent)
-            add_links!(subtree, id, parent)
-        elseif parent!=0 # assuming 1st stage node is 1
+        connect_variables!(tree, block_id, coupling_variables, nodes, subtree, id, subnode)
+    end
+    return subtree
+end
+
+function connect_variables!(tree::Tree, block_id::Int, coupling_variables::Vector{CouplingVariableRef}, nodes::Vector{Tuple{TreeNode,Float64}}, subtree::SubTree, id::Int, subnode::SubTreeNode)
+    pid = get_parent(subnode)
+    cid = get_children(subnode)
+    # couple out-going variables if not all child node exist
+    if length(cid) > 0
+        all_children_in_subtree = true
+        for c in cid
+            if !haskey(subtree.nodes, c[0])
+                all_children_in_subtree = false
+                break
+            end
+        end
+        if !all_children_in_subtree
+            couple_common_variables!(coupling_variables, block_id, subnode)
+        end
+    end
+    # couple public out-going variables
+    for ((label_, symb), var) in subnode.pub_out
+        couple_variables!(coupling_variables, block_id, label_, symb, var)
+    end
+    # connect in-coming variables
+    if parent!=0
+        if haskey(subtree.nodes, pid)
+            add_links!(subtree, id, pid)
+        else
+            # set current node as root of subtree
             subtree.parent = parent
             subtree.root = id
             couple_incoming_variables!(coupling_variables, block_id, subnode)
         end
     end
-    return subtree
+    # connect public in-coming variables
+    for ((label, symb), var1) in node.pub_in
+        if haskey(subtree.nodes, label)
+            source = tree.nodes[label]
+            var2 = source.pub_out[label, symb]
+            @constraint(tree.model, var1 .== var2)
+        else
+            couple_variables!(coupling_variables, block_id, label, symb, var1)
+        end
+    end
 end
 
 function set_objective!(tree::SubTree, sense::MOI.OptimizationSense, obj::Union{Float64, JuMP.AbstractJuMPScalar})
@@ -275,11 +310,6 @@ function add_links!(tree::SubTree, id::Int, pt::Int)
         var2 = parent.out[symb]
         @constraint(tree.model, var1 .== var2)
     end
-    for ((label, symb), var1) in node.pub_in
-        source = tree.nodes[label]
-        var2 = source.pub_out[label, symb]
-        @constraint(tree.model, var1 .== var2)
-    end
 end
 
 """
@@ -298,9 +328,6 @@ function couple_common_variables!(coupling_variables::Vector{CouplingVariableRef
     for (symb, var) in node.out
         couple_variables!(coupling_variables, block_id, label, symb, var)
     end
-    for ((label_, symb), var) in node.pub_out
-        couple_variables!(coupling_variables, block_id, label_, symb, var)
-    end
 end
 
 """
@@ -318,9 +345,6 @@ function couple_incoming_variables!(coupling_variables::Vector{CouplingVariableR
     label = get_parent(child)
     for (symb, var) in child.in
         couple_variables!(coupling_variables, block_id, label, symb, var)
-    end
-    for ((label_, symb), var) in child.pub_in
-        couple_variables!(coupling_variables, block_id, label_, symb, var)
     end
 end
 

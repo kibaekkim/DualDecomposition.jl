@@ -119,9 +119,9 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             num_solve = 1
             num_timel = 0
     
-            while true
+            maxiter = 10 # repeat up to 10 times
+            for _ in 1:maxiter
                 status = JuMP.termination_status(m)
-                println(status)
                 if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
                     objval = -JuMP.objective_value(m)
                     break
@@ -139,6 +139,9 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
                     @error "Unexpected solution status: $(status)"
                     break
                 end
+                if _ == maxiter
+                    @error "Could not find feasible solution"
+                end 
             end
     
             # Initialize subgradients

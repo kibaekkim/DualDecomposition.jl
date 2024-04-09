@@ -26,6 +26,10 @@ mutable struct AdmmLagrangeDual <: AbstractLagrangeDual
     bundle_time::Vector{Dict{Int,Float64}}
     eval_time::Vector{Dict{Int,Float64}}
     num_cuts::Vector{Dict{Int,Int}}
+    num_subiter::Dict{Int,Int}
+    num_subiters::Vector{Dict{Int,Int}}
+    num_subtimelim::Dict{Int,Int}
+    num_subtimelims::Vector{Dict{Int,Int}}
     subcomm_time::Vector{Float64}
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
@@ -49,6 +53,10 @@ mutable struct AdmmLagrangeDual <: AbstractLagrangeDual
         LD.bundle_time = []
         LD.eval_time = []
         LD.num_cuts = []
+        LD.num_subiter = Dict()
+        LD.num_subiters = []
+        LD.num_subtimelim = Dict()
+        LD.num_subtimelims = []
         LD.subcomm_time = []
         LD.subobj_value = []
         LD.master_time = []
@@ -97,6 +105,8 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
 
 
     for (id,block) in block_model(LD)
+        LD.num_subiter[id] = 0
+        LD.num_subtimelim[id] = 0
         function solve_subproblem(u::Array{Float64,1})
             @assert length(u) == length(LD.block_to_vars[id])
             for (i, var) in enumerate(LD.block_to_vars[id])
@@ -106,15 +116,28 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             # Solver the Lagrange dual
             m = block_model(LD,id)
             solve_sub_block!(m)
+            num_solve = 1
+            num_timel = 0
     
-            status = JuMP.termination_status(m)
-            # @assert status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
-    
-            # We may want consider other statuses.
-            if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
-                objval = -JuMP.objective_value(m)
-            else
-                @error "Unexpected solution status: $(status)"
+            while true
+                status = JuMP.termination_status(m)
+                if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
+                    objval = -JuMP.objective_value(m)
+                    break
+                elseif status in [MOI.TIME_LIMIT]
+                    num_timel += 1
+                    if JuMP.primal_status(m) in [MOI.FEASIBPE_POINT]
+                        objval = -JuMP.objective_bound(m)
+                        break
+                    else
+                        # repeat until feasible solution is found
+                        solve_sub_block!(m)
+                        num_solve += 1
+                    end
+                else
+                    @error "Unexpected solution status: $(status)"
+                    break
+                end
             end
     
             # Initialize subgradients
@@ -126,6 +149,9 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             for (i, var) in enumerate(LD.block_to_vars[id])
                 reset_objective_function!(LD, var, u[i])
             end
+
+            LD.num_subiter[id]    += num_solve
+            LD.num_subtimelim[id] += num_timel
     
             return [objval], subgrad
         end
@@ -159,6 +185,10 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
         bundle_time = Dict{Int,Float64}()
         eval_time = Dict{Int,Float64}()
         num_cuts = Dict{Int, Int}()
+        num_subiter = Dict{Int,Tuple{Int,Int}}()
+        for (id, bm) in LD.bundlemethods
+            num_subiter[id] = (0,0)
+        end
 
         for (id, bm) in LD.bundlemethods
             n = length(LD.block_to_vars[id])
@@ -211,6 +241,8 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             push!(LD.bundle_time, bundle_time)
             push!(LD.eval_time, eval_time)
             push!(LD.num_cuts, num_cuts)
+            push!(LD.num_subiters, copy(LD.num_subiter))
+            push!(LD.num_subtimelims, copy(LD.num_subtimelim))
         end
 
 
@@ -280,6 +312,8 @@ function write_times(LD::AdmmLagrangeDual; dir = ".")
     write_file!(LD.bundle_time, "bundle_time", dir)
     write_file!(LD.eval_time, "eval_time", dir)
     write_file!(LD.num_cuts, "num_cuts", dir)
+    write_file!(LD.num_subiters, "num_subiters", dir)
+    write_file!(LD.num_subtimelims, "num_subtimelims", dir)
 end
 
 function write_all(LD::AdmmLagrangeDual; dir = ".")

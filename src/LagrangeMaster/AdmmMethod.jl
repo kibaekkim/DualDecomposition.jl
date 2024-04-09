@@ -438,7 +438,7 @@ function run!(method::AdmmMaster)
             break
         end
         if total_time > method.maxtime
-            @printf("Time limit reached")
+            @printf("Time limit reached\n")
             break
         end
     end

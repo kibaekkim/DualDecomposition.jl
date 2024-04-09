@@ -120,6 +120,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
             num_timel = 0
     
             maxiter = 10 # repeat up to 10 times
+            objval = 0.0
             for it in 1:maxiter
                 status = JuMP.termination_status(m)
                 if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]

@@ -121,6 +121,7 @@ function run!(LD::AdmmLagrangeDual, LM::AdmmMaster)
     
             while true
                 status = JuMP.termination_status(m)
+                println(status)
                 if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
                     objval = -JuMP.objective_value(m)
                     break

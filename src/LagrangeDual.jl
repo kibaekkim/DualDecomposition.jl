@@ -115,6 +115,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             # We may want consider other statuses.
             if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
                 objvals[id] = -JuMP.objective_value(m)
+                # keep solutions TODO: How to keep best solutions?
                 av = JuMP.all_variables(m)
                 for v in av
                     block_solutions(LD, id)[string(v)] = JuMP.value(v)
@@ -212,9 +213,6 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
     
         # get dual solution
         LD.block_model.dual_solution = get_solution(LM)
-
-        # solve subproblem with final dual_solution to obtain best block_solutions
-        solveLagrangeDual(LD.block_model.dual_solution)
 
         # broadcast we are done.
         parallel.bcast(Float64[])

@@ -56,16 +56,12 @@ function create_nodes()::DD.Tree
     tree = DD.Tree(ξ)
 
     #subproblem formulation
-    function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
-        mdl = subtree.model
-        x = @variable(mdl, x[l=1:L], Int, base_name="n1_x")
-        #x = @variable(mdl, x[l=1:L], base_name="n1_x")
+    function subproblem_builder(mdl::JuMP.Model, node::DD.SubTreeNode)
+        @variable(mdl, x[l=1:L], DD.ControlInfo, subnode = node, ref_symbol = :x)
 
-        y = @variable(mdl, y[l=1:L] >= 0, base_name="n1_y")
-        DD.set_output_variable!(node, :y, y)
+        @variable(mdl, y[l=1:L] >= 0, DD.OutStateInfo, subnode = node, ref_symbol = :y)
 
-        B = @variable(mdl, B >= 0, base_name="n1_B")
-        DD.set_output_variable!(node, :B, B)
+        @variable(mdl, B >= 0, DD.OutStateInfo, subnode = node, ref_symbol = :B)
 
         π = DD.get_scenario(node)[:π]
         @constraints(mdl, 
@@ -75,10 +71,6 @@ function create_nodes()::DD.Tree
             end
         )
         DD.set_stage_objective(node, 0.0)
-
-        JuMP.unregister(mdl, :x)
-        JuMP.unregister(mdl, :y)
-        JuMP.unregister(mdl, :B)
     end
 
     DD.set_stage_builder!(tree, 1, subproblem_builder)
@@ -96,23 +88,16 @@ function create_nodes!(tree::DD.Tree, pt::Int)
         id = DD.add_child!(tree, pt, ξ, prob)
 
         #subproblem formulation
-        function subproblem_builder(tree::DD.Tree, subtree::DD.SubTree, node::DD.SubTreeNode)
-            mdl = subtree.model
-            id = DD.get_id(node)
-            #x = @variable(mdl, x[l=1:L], Int, base_name = "n$(id)_x")
-            x = @variable(mdl, x[l=1:L], base_name = "n$(id)_x")
+        function subproblem_builder(mdl::JuMP.Model, node::DD.SubTreeNode)
+            @variable(mdl, x[l=1:L], DD.ControlInfo, subnode = node, ref_symbol = :x)
 
-            y = @variable(mdl, y[l=1:L] >= 0, base_name = "n$(id)_y")
-            DD.set_output_variable!(node, :y, y)
+            @variable(mdl, y[l=1:L] >= 0, DD.OutStateInfo, subnode = node, ref_symbol = :y)
 
-            B = @variable(mdl, B >= 0, base_name = "n$(id)_B")
-            DD.set_output_variable!(node, :B, B)
+            @variable(mdl, B >= 0, DD.OutStateInfo, subnode = node, ref_symbol = :B)
 
-            y_ = @variable(mdl, y_[l=1:L] >= 0, base_name = "n$(id)_y_")
-            DD.set_input_variable!(node, :y, y_)
+            @variable(mdl, y_[l=1:L] >= 0, DD.InStateInfo, subnode = node, ref_symbol = :y)
 
-            B_ = @variable(mdl, B_ >= 0, base_name = "n$(id)_B_")
-            DD.set_input_variable!(node, :B, B_)
+            @variable(mdl, B_ >= 0, DD.InStateInfo, subnode = node, ref_symbol = :B)
 
             π = DD.get_scenario(node)[:π]
             pt = DD.get_parent(node)
@@ -129,11 +114,6 @@ function create_nodes!(tree::DD.Tree, pt::Int)
             else
                 DD.set_stage_objective(node, -(B + sum( π[l] * y[l] for l in 1:L )))
             end
-            JuMP.unregister(mdl, :x)
-            JuMP.unregister(mdl, :y)
-            JuMP.unregister(mdl, :B)
-            JuMP.unregister(mdl, :y_)
-            JuMP.unregister(mdl, :B_)
         end
 
         DD.set_stage_builder!(tree, id, subproblem_builder)
@@ -175,7 +155,7 @@ models = Dict{Int,JuMP.Model}()
 
 for block_id in parallel.getpartition()
     nodes = node_cluster[block_id]
-    subtree = DD.create_subtree!(tree, block_id, coupling_variables, nodes)
+    subtree = DD.create_subtree!(block_id, coupling_variables, nodes)
     set_optimizer(subtree.model, GLPK.Optimizer)
     DD.add_block_model!(algo, block_id, subtree.model)
     models[block_id] = subtree.model

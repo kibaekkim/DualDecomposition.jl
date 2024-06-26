@@ -17,6 +17,9 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
     subobj_value::Vector{Float64}
     master_time::Vector{Float64}
 
+    tree
+    subtrees
+
     function LagrangeDual()
         LD = new()
         LD.block_model = BlockModel()
@@ -26,6 +29,9 @@ mutable struct LagrangeDual <: AbstractLagrangeDual
         LD.subcomm_time = []
         LD.subobj_value = []
         LD.master_time = []
+
+        LD.tree = nothing
+        LD.subtrees = nothing
         
         return LD
     end
@@ -64,7 +70,7 @@ primal_solution(LD::AbstractLagrangeDual) = primal_solution(LD.block_model)
 
 This runs the Lagrangian dual method for solving the block model.
 """
-function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ = nothing)
+function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ = nothing, bound = nothing)
 
     # We assume that the block models are distributed.
     num_all_blocks = parallel.sum(num_blocks(LD))
@@ -73,6 +79,9 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
     # initialize λ if it is nothing
     if isnothing(initial_λ)
         initial_λ = zeros(num_all_coupling_variables)
+    end
+    if isnothing(bound)
+        bound = Inf
     end
     @assert length(initial_λ) == num_all_coupling_variables
 
@@ -119,6 +128,12 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
                 for v in av
                     block_solutions(LD, id)[string(v)] = JuMP.value(v)
                 end
+            elseif status in [MOI.TIME_LIMIT]
+                objvals[id] = -JuMP.objective_bound(m)
+            elseif status in [MOI.SOLUTION_LIMIT]
+                objvals[id] = -JuMP.objective_bound(m)
+                numintsol = get_optimizer_attribute(m, "CPX_PARAM_INTSOLLIM")
+                set_optimizer(m, optimizer_with_attributes(CPLEX.Optimizer, "CPX_PARAM_INTSOLLIM" => numintsol + 10))
             else
                 @error "Unexpected solution status: $(status)"
             end
@@ -196,7 +211,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
     end
 
     if parallel.is_root()
-        load!(LM, num_all_coupling_variables, num_all_blocks, solveLagrangeDual, initial_λ)
+        load!(LM, num_all_coupling_variables, num_all_blocks, solveLagrangeDual, initial_λ, bound)
     
         # Add bounding constraints to the Lagrangian master
         add_constraints!(LD, LM)
@@ -277,7 +292,7 @@ index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableRef) = index_of_λ(LD
 
 function write_times(LD::AbstractLagrangeDual; dir = ".")
     write_file!(LD.subsolve_time, "subsolve_time.txt", dir)
-    write_file!(LD.master_time, "subcomm_time.txt", dir)
+    write_file!(LD.subcomm_time, "subcomm_time.txt", dir)
     write_file!(LD.master_time, "master_time.txt", dir)
 end
 

@@ -39,6 +39,7 @@ add_block_model!(LD::AbstractLagrangeDual, block_id::Integer, model::JuMP.Model)
 num_blocks(LD::AbstractLagrangeDual) = num_blocks(LD.block_model)
 block_model(LD::AbstractLagrangeDual, block_id::Integer) = block_model(LD.block_model, block_id)
 block_model(LD::AbstractLagrangeDual) = block_model(LD.block_model)
+block_solutions(LD::AbstractLagrangeDual, block_id::Integer) = block_solutions(LD.block_model, block_id)
 has_block_model(LD::AbstractLagrangeDual, block_id::Integer) = has_block_model(LD.block_model, block_id)
 num_coupling_variables(LD::AbstractLagrangeDual) = num_coupling_variables(LD.block_model)
 coupling_variables(LD::AbstractLagrangeDual) = coupling_variables(LD.block_model)
@@ -114,6 +115,10 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             # We may want consider other statuses.
             if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
                 objvals[id] = -JuMP.objective_value(m)
+                av = JuMP.all_variables(m)
+                for v in av
+                    block_solutions(LD, id)[string(v)] = JuMP.value(v)
+                end
             else
                 @error "Unexpected solution status: $(status)"
             end

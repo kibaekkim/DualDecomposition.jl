@@ -1,0 +1,14 @@
+reset;
+model uc_model-old.mod; 
+data  uc_data.dat;
+option solver cplexamp;
+option cplex_options 'mipdisplay 4 mipinterval=100 timing=1 timelimit=1800 relax';
+
+#option cplex_options 'mipgap 0.0001 mipdisplay 1 timing=1 iisfind=1 u 2147483647';
+
+problem SCUC_old:u, y,z, p, p_ur,p_dr, csu, theta, ff, fb, delta, cpg,
+startup_cost, gen_lmt1, gen_lmt2, gen_lmt3, gen_lmt4, gen_lmt5, reserve_up, reserve_down,
+sup_demand, ramp_up, ramp_down, min_up1, min_up2, min_down1, min_down2,
+flow_bal, kirchoff_law, line_lmt1, line_lmt2, ref_bus, urelation, urelation1, totalcost;
+
+solve SCUC_old;

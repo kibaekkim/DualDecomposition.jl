@@ -1,7 +1,7 @@
 name = "DualDecomposition"
 uuid = "d0e446f1-e135-48f1-a6ea-e9a6190f2a7a"
 authors = ["Kibaek Kim <kimk@anl.gov>"]
-version = "0.3.3"
+version = "0.3.4"
 
 [deps]
 BundleMethod = "e8a6717a-069f-43d5-9ac2-a49b1ec5be7b"

@@ -64,10 +64,10 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
       @variable(model, u[i=sR,t=sT], Bin)
       @variable(model, y[i=sR,j=sN,t=sT], Bin)
       @variable(model, z[j=sN,t=sT], Bin)
-      @objective(model, Min,
+      @objective(model, Min, (
             sum(a[i,t]*x[i,t] + b[i,t]*u[i,t] for i in sR for t in sT)
           + sum(c[i,j,t,s]*y[i,j,t] for i in sR for j in sN for t in sT)
-          + sum(c0[j,t,s]*z[j,t] for j in sN for t in sT))
+          + sum(c0[j,t,s]*z[j,t] for j in sN for t in sT)))
       @constraint(model, [i=sR,t=sT], x[i,t] - u[i,t] <= 0)
       @constraint(model, [i=sR,t=sT], -sum(x[i,tau] for tau in 1:t) + sum(d[j,t,s]*y[i,j,t] for j in sN) <= 0)
       @constraint(model, [j=sN,t=sT], sum(y[i,j,t] for i in sR) + z[j,t] == 1)
@@ -100,8 +100,9 @@ function main_dcap(nR::Int, nN::Int, nT::Int, nS::Int, seed::Int=1)
   # Set nonanticipativity variables as an array of symbols.
   DD.set_coupling_variables!(algo, coupling_variables)
   
-  # Solve the problem with the solver; this solver is for the underlying bundle method.
-  DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+  LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+
+  DD.run!(algo, LM)
 end
 
 main_dcap(2,3,3,20)

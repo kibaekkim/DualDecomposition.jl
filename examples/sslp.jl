@@ -63,10 +63,10 @@ function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
         @variable(model, y[i=sI,j=sJ], Bin)
         @variable(model, y0[j=sJ] >= 0)
     
-        @objective(model, Min,
+        @objective(model, Min, (
               sum(c[j]*x[j] for j in sJ)
             - sum(q[i,j,s]*y[i,j] for i in sI for j in sJ)
-            + sum(q0[j]*y0[j] for j in sJ))
+            + sum(q0[j]*y0[j] for j in sJ)))
     
         @constraint(model, sum(x[j] for j in sJ) <= v)
         @constraint(model, [j=sJ], sum(d[i,j,s]*y[i,j] for i in sI) - y0[j] <= u*x[j])
@@ -96,8 +96,11 @@ function main_sslp(nJ::Int, nI::Int, nS::Int, seed::Int=1)
     # Set nonanticipativity variables as an array of symbols.
     DD.set_coupling_variables!(algo, coupling_variables)
     
+    # Lagrange master method
+    LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+
     # Solve the problem with the solver; this solver is for the underlying bundle method.
-    DD.run!(algo, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+    DD.run!(algo, LM)
 end
 
 main_sslp(10,50,50)

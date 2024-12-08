@@ -101,6 +101,29 @@ function collect(x::Vector{T}) where {T}
     return x
 end
 
+function combine_dict(x::Dict{Int,Int})
+    if nprocs() > 1
+        ks = Vector{Int}()
+        vs = Vector{Int}()
+        for (k,v) in x
+            push!(ks,k)
+            push!(vs,v)
+        end
+        counts::Vector{Cint} = MPI.Allgather!([length(ks)], UBuffer(similar([1], nprocs()), 1), MPI.COMM_WORLD)
+        if is_root()
+            ks_collected = MPI.Gatherv!(ks, VBuffer(similar(ks, Base.sum(counts)), counts), 0, MPI.COMM_WORLD)
+            vs_collected = MPI.Gatherv!(vs, VBuffer(similar(vs, Base.sum(counts)), counts), 0, MPI.COMM_WORLD)
+            for i in 1:length(ks_collected)
+                x[ks_collected[i]] = vs_collected[i]
+            end
+        else
+            MPI.Gatherv!(ks, nothing, 0, MPI.COMM_WORLD)
+            MPI.Gatherv!(vs, nothing, 0, MPI.COMM_WORLD)
+        end
+    end
+    return x
+end
+
 function combine_dict(x::Dict{Int,Float64})
     if nprocs() > 1
         ks = Vector{Int}()

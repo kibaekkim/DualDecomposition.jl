@@ -145,6 +145,8 @@ mutable struct SubTreeNode <: AbstractTreeNode
     weight::Float64
     in::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}    # incoming variables
     out::Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # outgoing variables
+    pub_in::Dict{Tuple{Int, Symbol}, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}    # incoming variables (public)
+    pub_out::Dict{Tuple{Int, Symbol}, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}   # outgoing variables (public)
     obj::Union{Float64, JuMP.AbstractJuMPScalar}
     function SubTreeNode(treenode::TreeNode, weight::Float64)
         stn = new()
@@ -152,6 +154,8 @@ mutable struct SubTreeNode <: AbstractTreeNode
         stn.weight = weight
         stn.in = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
         stn.out = Dict{Symbol, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
+        stn.pub_in = Dict{Tuple{Int, Symbol}, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
+        stn.pub_out = Dict{Tuple{Int, Symbol}, Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}}}()
         stn.obj = 0.0
         return stn
     end
@@ -170,6 +174,14 @@ end
 
 function set_output_variable!(nd::SubTreeNode, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
     nd.out[symb] = var
+end
+
+function set_public_input_variable!(nd::SubTreeNode, label::Int, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
+    nd.pub_in[label, symb] = var
+end
+
+function set_public_output_variable!(nd::SubTreeNode, label::Int, symb::Symbol, var::Union{JuMP.VariableRef, <:AbstractArray{JuMP.VariableRef}})
+    nd.pub_out[label, symb] = var
 end
 
 function set_stage_objective(nd::SubTreeNode, obj::Union{Float64, JuMP.AbstractJuMPScalar})
@@ -228,17 +240,52 @@ function create_subtree!(tree::Tree, block_id::Int, coupling_variables::Vector{C
 
     # 
     for (id, subnode) in subtree.nodes
-        couple_common_variables!(coupling_variables, block_id, subnode)
-        parent = get_parent(subnode)
-        if parent!=0 && haskey(subtree.nodes, parent)
-            add_links!(subtree, id, parent)
-        elseif parent!=0 # assuming 1st stage node is 1
-            subtree.parent = parent
+        connect_variables!(tree, block_id, coupling_variables, nodes, subtree, id, subnode)
+    end
+    return subtree
+end
+
+function connect_variables!(tree::Tree, block_id::Int, coupling_variables::Vector{CouplingVariableRef}, nodes::Vector{Tuple{TreeNode,Float64}}, subtree::SubTree, id::Int, subnode::SubTreeNode)
+    pid = get_parent(subnode)
+    cid = get_children(subnode)
+    # couple out-going variables if not all child node exist
+    if length(cid) > 0
+        all_children_in_subtree = true
+        for (c,r) in cid
+            if !haskey(subtree.nodes, c)
+                all_children_in_subtree = false
+                break
+            end
+        end
+        if !all_children_in_subtree
+            couple_common_variables!(coupling_variables, block_id, subnode)
+        end
+    end
+    # couple public out-going variables
+    for ((label_, symb), var) in subnode.pub_out
+        couple_variables!(coupling_variables, block_id, label_, symb, var)
+    end
+    # connect in-coming variables
+    if pid!=0
+        if haskey(subtree.nodes, pid)
+            add_links!(subtree, id, pid)
+        else
+            # set current node as root of subtree
+            subtree.parent = pid
             subtree.root = id
             couple_incoming_variables!(coupling_variables, block_id, subnode)
         end
     end
-    return subtree
+    # connect public in-coming variables
+    for ((label, symb), var1) in subnode.pub_in
+        if haskey(subtree.nodes, label)
+            source = subtree.nodes[label]
+            var2 = source.pub_out[label, symb]
+            @constraint(subtree.model, var1 .== var2)
+        else
+            couple_variables!(coupling_variables, block_id, label, symb, var1)
+        end
+    end
 end
 
 function set_objective!(tree::SubTree, sense::MOI.OptimizationSense, obj::Union{Float64, JuMP.AbstractJuMPScalar})

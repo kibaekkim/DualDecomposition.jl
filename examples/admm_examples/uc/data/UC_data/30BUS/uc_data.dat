@@ -1,0 +1,57 @@
+# bus data input
+
+param: N: bus_type bus_p_load:=
+include bus.dat;
+
+# branch data input
+param: L: branch_from branch_to branch_type branch_r branch_x branch_c branch_p_maxflow branch_p_maxflow2 branch_p_maxflow3:=
+include branch.dat;
+
+read  NUNITS < power_system_data.dat;                        
+read  NSEGMENTS < power_system_data.dat;                          
+read  NHOURS < power_system_data.dat;  
+read  NBUS < power_system_data.dat;  
+read  NBRANCH < power_system_data.dat;  
+#read  NPS < power_system_data.dat;  
+
+read {g in G} BUS_UNIT[g] < power_system_data.dat; 
+read {g in G} PMAX[g] < power_system_data.dat;  
+read {g in G} PMIN[g] < power_system_data.dat;  
+read {g in G} PO[g] < power_system_data.dat;  
+read {g in G} nSTATE[g] < power_system_data.dat; 
+read {g in G} MDT[g] < power_system_data.dat;  
+read {g in G} MUT[g] < power_system_data.dat; 
+read {g in G} RU[g] < power_system_data.dat;  
+read {g in G} RD[g] < power_system_data.dat;  
+read {g in G} MSR[g] < power_system_data.dat;  
+read {g in G} QSC[g] < power_system_data.dat;  
+read {l in L} UBO[l] < power_system_data.dat;  
+read {g in G} NLC[g] < power_system_data.dat;
+read {g in G} SUCC[g] < power_system_data.dat;  
+read {g in G} SUHC[g] < power_system_data.dat;
+read {g in G} SDC[g] < power_system_data.dat;  
+read {g in G} nCOLD[g] < power_system_data.dat; 
+read {g in G, k in K} MC[g,k] < power_system_data.dat;  
+read {g in G, k in K} PR[g,k] < power_system_data.dat;  
+
+read{t in T} D[t] < load.dat;
+
+
+for{n in N} {
+   let p_bus_load_por[n]  := bus_p_load[n]/(sum{ib in N} bus_p_load[ib]);
+   let {t in T} p_bus_load[n,t] := p_bus_load_por[n]*0.02*D[t];
+  };
+
+
+for{l in L}
+{
+   let branch_B[l] := 1/branch_x[l];
+}
+
+for { g in G} { if nSTATE[g] <= 0 then { let UO[g] := 0} 
+                                  else { let UO[g] := 1} 
+    }         # computes state of units at time 0
+                                          
+let { g in G} INOFF[g] := -nSTATE[g]*(1-UO[g]);                    # compute the number of hours that the unit has initially been off
+let { g in G} MBOFF[g] :=  max(0,MDT[g]+nSTATE[g])*(1-UO[g]);       # compute must initially be off
+let { g in G} MBON[g]  :=  max(0,MUT[g]-nSTATE[g])*UO[g] ;          # compute must initially be on

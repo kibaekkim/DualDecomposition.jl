@@ -32,6 +32,8 @@ include("LagrangeMaster/LagrangeMaster.jl")
 include("LagrangeMaster/BundleMethod.jl")
 include("LagrangeMaster/SubgradientMethod.jl")
 include("LagrangeDual.jl")
+include("LagrangeMaster/AdmmMethod.jl")
+include("AdmmLagrangeDual.jl")
 include("ScenarioTree.jl")
 include("utils.jl")
 

@@ -115,6 +115,7 @@ function run!(LD::AbstractLagrangeDual, LM::AbstractLagrangeMaster, initial_λ =
             # We may want consider other statuses.
             if status in [MOI.OPTIMAL, MOI.LOCALLY_SOLVED]
                 objvals[id] = -JuMP.objective_value(m)
+                # keep solutions TODO: How to keep best solutions?
                 av = JuMP.all_variables(m)
                 for v in av
                     block_solutions(LD, id)[string(v)] = JuMP.value(v)
@@ -276,8 +277,8 @@ index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableKey) = LD.var_to_inde
 index_of_λ(LD::AbstractLagrangeDual, var::CouplingVariableRef) = index_of_λ(LD, var.key)
 
 function write_times(LD::AbstractLagrangeDual; dir = ".")
-    write_file!(LD.subsolve_time, "subsolve_time.txt", dir)
-    write_file!(LD.master_time, "subcomm_time.txt", dir)
+    write_file!(LD.subsolve_time, "subsolve_time", dir)
+    write_file!(LD.subcomm_time, "subcomm_time.txt", dir)
     write_file!(LD.master_time, "master_time.txt", dir)
 end
 

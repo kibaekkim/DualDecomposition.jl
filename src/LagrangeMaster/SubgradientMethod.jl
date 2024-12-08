@@ -47,7 +47,7 @@ mutable struct SubgradientMaster <: AbstractLagrangeMaster
     end
 end
 
-function load!(method::SubgradientMaster, num_coupling_variables::Int, num_blocks::Int, eval_function::Function, init_sol::Vector{Float64})
+function load!(method::SubgradientMaster, num_coupling_variables::Int, num_blocks::Int, eval_function::Function, init_sol::Vector{Float64}, bound::Float64)
     method.num_vars = num_coupling_variables
     method.num_functions = num_blocks
     method.eval_f = eval_function

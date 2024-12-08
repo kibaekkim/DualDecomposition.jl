@@ -1,11 +1,11 @@
-@testset "investment" begin
+@testset "investment_dro" begin
 
     """
     a: interest rate
     π: unit stock price
     ρ: unit dividend price
-    
-    
+
+
     K: number of stages
     L: number of stock types
     2^L scenarios in each stage
@@ -15,18 +15,18 @@
     stock1: 1.03 or 0.97
     stock2: 1.06 or 0.94
     ...
-    
+
     b_k: initial asset (if k=1) and income (else)
     B_k: money in bank
     x_{k,l}: number of stocks to buy/sell (integer)
     y_{k,l}: total stocks 
-    
+
     deterministic model:
-    
+
         max     B_K+∑_{l=1}^{L}π_{K,l}y_{K,l}
-    
+
         s.t.    B_1+∑_{l=1}^{L}π_{1,l}x_{1,l} = b_1
-    
+
                 b_k+(1+a)B_{k-1}+∑_{l=1}^{L}ρ_{k,l}y_{k-1,l} = B_k+∑_{l=1}^{L}π_{k,l}x_{k,l}, ∀ k=2,…,K
         
                 y_{1,l} = x_{1,l}, ∀ l=1,…,L
@@ -39,16 +39,40 @@
         
                 B_k ≥ 0, ∀ k=1,…,K.
     """
+    rng = Random.MersenneTwister(1234)
     K = 3
     L = 2
     a = 0.01
     b_init = 100  # initial capital
     b_in = 30   # income
+
+    """
+    In each node, we have Np=10 samples from a log-normal distribution
+    """
+    Np = 10 # number of samples
+
+    function generate_sample(π::Array{Float64})::Array{DD.Sample}
+        # generates random samples following a lognormal distribution
+        ret = Array{DD.Sample}(undef, Np)
+        for ii in 1:Np
+            π_samp = Array{Float64}(undef, L)
+            for l in 1:L
+                sig = sqrt( log( 0.5+sqrt( ( 0.03*l )^2+0.25 ) ) )
+                rnd = sig * randn(rng) .+ log(π[l])
+                π_samp[l] = exp(rnd)
+            end
+            ret[ii] = DD.Sample(Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(:π => π_samp), 1/Np)
+        end
+        return ret
+    end
+
     # iteratively add nodes
     # root node
     function create_nodes()::DD.Tree
         ξ = Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(:π => ones(L))
-        tree = DD.Tree(ξ)
+        ξ_samp = generate_sample(ξ[:π])
+        set = DD.WassersteinSet(ξ_samp, 1.0, DD.norm_L1)
+        tree = DD.Tree(ξ, set)
 
         #subproblem formulation
         function subproblem_builder(mdl::JuMP.Model, node::DD.SubTreeNode)
@@ -80,7 +104,14 @@
             prob = 1/2^L
             π = get_realization(DD.get_scenario(tree, pt)[:π], scenario)
             ξ = Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(:π => π)
-            id = DD.add_child!(tree, pt, ξ, prob)
+            if DD.get_stage(tree, pt) != K-1
+                ξ_samp = generate_sample(ξ[:π])
+                set = DD.WassersteinSet(ξ_samp, 1.0, DD.norm_L1)
+                id = DD.add_child!(tree, pt, ξ, set)
+            else 
+                id = DD.add_child!(tree, pt, ξ, nothing)
+            end
+            
 
             #subproblem formulation
             function subproblem_builder(mdl::JuMP.Model, node::DD.SubTreeNode)
@@ -110,7 +141,6 @@
                     DD.set_stage_objective(node, -(B + sum( π[l] * y[l] for l in 1:L )))
                 end
             end
-
             DD.set_stage_builder!(tree, id, subproblem_builder)
             if DD.get_stage(tree, id) < K
                 create_nodes!(tree, id)
@@ -129,42 +159,25 @@
     end
 
     tree = create_nodes()
-    #node_cluster = DD.decomposition_not(tree)
-    node_cluster = DD.decomposition_scenario(tree)
-    
-    @testset "ProximalMethod" begin
-        # Create DualDecomposition instance.
-        algo = DD.LagrangeDual()
 
-        coupling_variables = Vector{DD.CouplingVariableRef}()
-        models = Dict{Int,JuMP.Model}()
-        for (block_id, nodes) in enumerate(node_cluster)
-            subtree = DD.create_subtree!(block_id, coupling_variables, nodes)
-            set_optimizer(subtree.model, GLPK.Optimizer)
-            DD.add_block_model!(algo, block_id, subtree.model)
-            models[block_id] = subtree.model
-        end
-
-        # Set nonanticipativity variables as an array of symbols.
-        DD.set_coupling_variables!(algo, coupling_variables)
-
-        # Lagrange master method
-        LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
-
-        # Solve the problem with the solver; this solver is for the underlying bundle method.
-        DD.run!(algo, LM)
-
-        @show DD.dual_objective_value(algo)
-        @show DD.dual_solution(algo)
-        @test isapprox(DD.dual_objective_value(algo), -171.75, rtol=1e-3)
+    @testset "deterministic" begin
+        
+        det = DD.create_Wasserstein_deterministic!(tree)
+        set_optimizer(det.model, GLPK.Optimizer)
+        JuMP.optimize!(det.model)
+        @show JuMP.objective_value(det.model)
+        @test isapprox(JuMP.objective_value(det.model), -164.64, rtol=1e-3)
     end
 
-    @testset "TrustRegionMethod" begin
+    @testset "non_decomposition" begin
+        node_cluster = DD.decomposition_not(tree)
+
         # Create DualDecomposition instance.
-        algo = DD.LagrangeDual()
+        algo = DD.DR_LagrangeDual(tree)
 
         coupling_variables = Vector{DD.CouplingVariableRef}()
         models = Dict{Int,JuMP.Model}()
+
         for (block_id, nodes) in enumerate(node_cluster)
             subtree = DD.create_subtree!(block_id, coupling_variables, nodes)
             set_optimizer(subtree.model, GLPK.Optimizer)
@@ -174,26 +187,32 @@
 
         # Set nonanticipativity variables as an array of symbols.
         DD.set_coupling_variables!(algo, coupling_variables)
+
+        bundle_init = DD.initialize_bundle(tree, algo, GLPK.Optimizer)
 
         # Lagrange master method
         LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
 
         # Solve the problem with the solver; this solver is for the underlying bundle method.
-        DD.run!(algo, LM)
+        DD.run!(algo, LM, bundle_init)
 
         @show DD.dual_objective_value(algo)
         @show DD.dual_solution(algo)
-        @test isapprox(DD.dual_objective_value(algo), -171.75, rtol=1e-3)
+        @test isapprox(DD.dual_objective_value(algo), -2912.64, rtol=1e-3)
+
     end
 
-    @testset "TemporalDecomposition" begin
-        node_cluster = DD.decomposition_temporal(tree)
+    @testset "scenario_decompostion" begin
+        node_cluster = DD.decomposition_scenario(tree)
+
         # Create DualDecomposition instance.
-        algo = DD.LagrangeDual()
+        algo = DD.DR_LagrangeDual(tree)
 
         coupling_variables = Vector{DD.CouplingVariableRef}()
         models = Dict{Int,JuMP.Model}()
+
         for (block_id, nodes) in enumerate(node_cluster)
+            nodes = node_cluster[block_id]
             subtree = DD.create_subtree!(block_id, coupling_variables, nodes)
             set_optimizer(subtree.model, GLPK.Optimizer)
             DD.add_block_model!(algo, block_id, subtree.model)
@@ -203,14 +222,51 @@
         # Set nonanticipativity variables as an array of symbols.
         DD.set_coupling_variables!(algo, coupling_variables)
 
+        bundle_init = DD.initialize_bundle(tree, algo, GLPK.Optimizer)
+
         # Lagrange master method
-        LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+        LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
 
         # Solve the problem with the solver; this solver is for the underlying bundle method.
-        DD.run!(algo, LM)
+        DD.run!(algo, LM, bundle_init)
 
         @show DD.dual_objective_value(algo)
         @show DD.dual_solution(algo)
-        @test isapprox(DD.dual_objective_value(algo), -171.75, rtol=1e-3)
+        @test isapprox(DD.dual_objective_value(algo), -2912.64, rtol=1e-3)
     end
+
+    @testset "non_decomposition" begin
+        node_cluster = DD.decomposition_temporal(tree)
+
+        # Create DualDecomposition instance.
+        algo = DD.DR_LagrangeDual(tree)
+
+        coupling_variables = Vector{DD.CouplingVariableRef}()
+        models = Dict{Int,JuMP.Model}()
+
+        for (block_id, nodes) in enumerate(node_cluster)
+            nodes = node_cluster[block_id]
+            subtree = DD.create_subtree!(block_id, coupling_variables, nodes)
+            set_optimizer(subtree.model, GLPK.Optimizer)
+            DD.add_block_model!(algo, block_id, subtree.model)
+            models[block_id] = subtree.model
+        end
+
+        # Set nonanticipativity variables as an array of symbols.
+        DD.set_coupling_variables!(algo, coupling_variables)
+
+        bundle_init = DD.initialize_bundle(tree, algo, GLPK.Optimizer)
+
+        # Lagrange master method
+        LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
+
+        # Solve the problem with the solver; this solver is for the underlying bundle method.
+        DD.run!(algo, LM, bundle_init)
+
+        @show DD.dual_objective_value(algo)
+        @show DD.dual_solution(algo)
+        @test isapprox(DD.dual_objective_value(algo), -2912.64, rtol=1e-3)
+
+    end
+
 end

@@ -1,8 +1,11 @@
 using JuMP, GLPK, Ipopt
 using DualDecomposition
+using Random
 
 const DD = DualDecomposition
 const parallel = DD.parallel
+
+const rng = Random.MersenneTwister(1234)
 
 """
 a: interest rate
@@ -49,11 +52,33 @@ const a = 0.01
 const b_init = 100  # initial capital
 const b_in = 30   # income
 
+"""
+In each node, we have Np=10 samples from a log-normal distribution
+"""
+const Np = 10 # number of samples
+
+function generate_sample(π::Array{Float64})::Array{DD.Sample}
+    # generates random samples following a lognormal distribution
+    ret = Array{DD.Sample}(undef, Np)
+    for ii in 1:Np
+        π_samp = Array{Float64}(undef, L)
+        for l in 1:L
+            sig = sqrt( log( 0.5+sqrt( ( 0.03*l )^2+0.25 ) ) )
+            rnd = sig * randn(rng) .+ log(π[l])
+            π_samp[l] = exp(rnd)
+        end
+        ret[ii] = DD.Sample(Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(:π => π_samp), 1/Np)
+    end
+    return ret
+end
+
 # iteratively add nodes
 # root node
 function create_nodes()::DD.Tree
     ξ = Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(:π => ones(L))
-    tree = DD.Tree(ξ)
+    ξ_samp = generate_sample(ξ[:π])
+    set = DD.WassersteinSet(ξ_samp, 1.0, DD.norm_L1)
+    tree = DD.Tree(ξ, set)
 
     #subproblem formulation
     function subproblem_builder(mdl::JuMP.Model, node::DD.SubTreeNode)
@@ -85,7 +110,14 @@ function create_nodes!(tree::DD.Tree, pt::Int)
         prob = 1/2^L
         π = get_realization(DD.get_scenario(tree, pt)[:π], scenario)
         ξ = Dict{Symbol, Union{Float64,<:AbstractArray{Float64}}}(:π => π)
-        id = DD.add_child!(tree, pt, ξ, prob)
+        if DD.get_stage(tree, pt) != K-1
+            ξ_samp = generate_sample(ξ[:π])
+            set = DD.WassersteinSet(ξ_samp, 1.0, DD.norm_L1)
+            id = DD.add_child!(tree, pt, ξ, set)
+        else 
+            id = DD.add_child!(tree, pt, ξ, nothing)
+        end
+        
 
         #subproblem formulation
         function subproblem_builder(mdl::JuMP.Model, node::DD.SubTreeNode)
@@ -115,7 +147,6 @@ function create_nodes!(tree::DD.Tree, pt::Int)
                 DD.set_stage_objective(node, -(B + sum( π[l] * y[l] for l in 1:L )))
             end
         end
-
         DD.set_stage_builder!(tree, id, subproblem_builder)
         if DD.get_stage(tree, id) < K
             create_nodes!(tree, id)
@@ -134,9 +165,16 @@ function get_realization(ξ::Array{Float64,1}, scenario::Int)::Array{Float64,1}
 end
 
 tree = create_nodes()
+
+det = DD.create_Wasserstein_deterministic!(tree)
+set_optimizer(det.model, GLPK.Optimizer)
+JuMP.optimize!(det.model)
+println(JuMP.objective_value(det.model))
+
+
 #node_cluster = DD.decomposition_not(tree)
-node_cluster = DD.decomposition_scenario(tree)
-#node_cluster = DD.decomposition_temporal(tree) #There is a DUAL_INFEASIBLE issue
+#node_cluster = DD.decomposition_scenario(tree)
+node_cluster = DD.decomposition_temporal(tree) #There is a DUAL_INFEASIBLE issue
 
 # Number of block components
 NS = length(node_cluster)
@@ -145,7 +183,7 @@ NS = length(node_cluster)
 parallel.init()
 
 # Create DualDecomposition instance.
-algo = DD.LagrangeDual()
+algo = DD.DR_LagrangeDual(tree)
 
 # partition scenarios into processes
 parallel.partition(NS)
@@ -164,12 +202,18 @@ end
 # Set nonanticipativity variables as an array of symbols.
 DD.set_coupling_variables!(algo, coupling_variables)
 
+bundle_init = DD.initialize_bundle(tree, algo, GLPK.Optimizer)
+#println(bundle_init)
+# for (id, node) in tree.nodes
+#    println(node.cost)
+# end
+
 # Lagrange master method
-LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
-#LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
+#LM = DD.BundleMaster(BM.ProximalMethod, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0))
+LM = DD.BundleMaster(BM.TrustRegionMethod, GLPK.Optimizer)
 
 # Solve the problem with the solver; this solver is for the underlying bundle method.
-DD.run!(algo, LM)
+DD.run!(algo, LM, bundle_init)
 
 
 # Write timing outputs to files
